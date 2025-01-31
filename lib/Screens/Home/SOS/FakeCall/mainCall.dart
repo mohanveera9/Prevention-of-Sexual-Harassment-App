@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:posh/Widgets/show_snakbar.dart';
 import 'package:record/record.dart'; // Add record package for audio recording
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,10 +29,13 @@ class _MaincallState extends State<Maincall> {
   bool isRecording = false;
   String? recordingPath;
   bool isLoading = false;
+  String _lat = "";
+  String _lag = "";
 
   @override
   void initState() {
     super.initState();
+    _getLiveLocation();
     _startAudioRecording();
     _startTimer();
   }
@@ -49,22 +53,37 @@ class _MaincallState extends State<Maincall> {
     return prefs.getString('auth_token');
   }
 
-  //Location
-  Future<Position> _getLocation() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      throw Exception("Location services are disabled.");
-    }
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        throw Exception("Location permission denied.");
+   //Location
+  Future<void> _getLiveLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        await Geolocator.openLocationSettings();
+        return;
       }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        return;
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        permission = await Geolocator.requestPermission();
+        return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      setState(() {
+        _lat = position.latitude.toString();
+        _lag = position.longitude.toString();
+      });
+    } catch (e) {
+      ShowSnakbar().showSnackbar('No internet...', Colors.red, context);
     }
-    return await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
   }
 
   // Start recording audio
@@ -144,8 +163,7 @@ class _MaincallState extends State<Maincall> {
         final secureUrl = jsonResponse['secure_url'] as String;
         print('Uploaded Audio URL: $secureUrl');
         // Optionally, send the audio URL along with the location data
-        Position position = await _getLocation();
-        _sendLocationToApi(position.latitude, position.longitude, secureUrl);
+        _sendLocationToApi(_lat, _lag, secureUrl);
       } else {
         print('Upload failed: ${response.reasonPhrase}');
       }
@@ -157,7 +175,7 @@ class _MaincallState extends State<Maincall> {
 
   //Send Loaction and audio
   Future<void> _sendLocationToApi(
-      double latitude, double longitude, String path) async {
+      String latitude, String longitude, String path) async {
     final token = await getToken();
     var url = Uri.parse(
         'https://tech-hackathon-glowhive.onrender.com/api/user/sos/submit');

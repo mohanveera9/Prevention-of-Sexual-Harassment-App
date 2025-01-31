@@ -27,11 +27,14 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
   bool isRecording = false;
   String? recordingPath;
   bool isLoading = false;
+  String _lat = '';
+  String _lag = '';
 
   @override
   void initState() {
     super.initState();
     getLive();
+    _getLiveLocation();
     _controller = AnimationController(
       vsync: this,
       duration: Duration(seconds: 2),
@@ -65,26 +68,44 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
   }
 
   //Location
-  Future<Position> _getLocation() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      throw Exception("Location services are disabled.");
-    }
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        throw Exception("Location permission denied.");
+  Future<void> _getLiveLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        await Geolocator.openLocationSettings();
+        ShowSnakbar().showSnackbar('Trun on location', Colors.red, context);
+        return;
       }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        ShowSnakbar().showSnackbar('Please allow location', Colors.red, context);
+        return;
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        permission = await Geolocator.requestPermission();
+        ShowSnakbar().showSnackbar('Please allow location', Colors.red, context);
+        return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      setState(() {
+        _lat = position.latitude.toString();
+        _lag = position.longitude.toString();
+      });
+    } catch (e) {
+      ShowSnakbar().showSnackbar('No internet...', Colors.red, context);
     }
-    return await Geolocator.getCurrentPosition(
-      // ignore: deprecated_member_use
-      desiredAccuracy: LocationAccuracy.high,
-    );
   }
 
+
   //SendLoaction
-  Future<void> _sendLocation(double latitude, double longitude) async {
+  Future<void> _sendLocation(String latitude, String longitude) async {
     final token = await getToken();
     var url = Uri.parse(
         'https://tech-hackathon-glowhive.onrender.com/api/user/sos/submit');
@@ -217,6 +238,95 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
     });
   }
 
+  void _showCountdownDialog1(
+      BuildContext context,String lat, String lag, String text) {
+    _countdown = 3; // Reset the countdown every time the dialog is opened
+    bool isDialogActive = true; // Track dialog state
+
+    showDialog(
+      context: context,
+      barrierDismissible:
+          false, // Prevent dismissing the dialog by tapping outside
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Start the countdown
+            _countdownTimer =
+                Timer.periodic(const Duration(seconds: 1), (timer) {
+              if (isDialogActive) {
+                setDialogState(() {
+                  if (_countdown > 1) {
+                    _countdown--;
+                  } else {
+                    _countdownTimer?.cancel();
+                    isDialogActive = false; // Mark dialog as closed
+                    Navigator.of(context).pop(); // Close the dialog
+                    _showSendingDialog(context);
+                    _sendLocation(lat, lag);
+                  }
+                });
+              }
+            });
+
+            return AlertDialog(
+              title: const Text('Emergency Alert'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$text $_countdown...', // Countdown updated here
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                  const SizedBox(height: 10),
+                  const CircularProgressIndicator(),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    _countdownTimer?.cancel(); // Cancel the countdown
+                    isDialogActive = false; // Mark dialog as closed
+                    Navigator.of(context).pop(); // Close the dialog
+                  },
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ).then((_) {
+      // Ensure the timer is canceled if the dialog is closed externally
+      isDialogActive = false;
+      _countdownTimer?.cancel();
+    });
+  }
+
+void _showSendingDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(
+            'Sending Location...',
+            style: TextStyle(
+              fontSize: 20
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              SizedBox(height: 10,)
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+
 
   @override
   void dispose() {
@@ -317,7 +427,7 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
                               GestureDetector(
                                 onTap: () async{
                                   if (await getLive()) {
-                                    _showCountdownDialog(context, , text)
+                                    _showCountdownDialog1(context, _lat, _lag, "Send you location in");
                                   }
                                 },
                                 child: Stack(
@@ -385,8 +495,9 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
                             SosButton(
                               icon: Icons.call,
                               label: 'Audio\nCall',
-                              onTap: () {
-                                Navigator.of(context).push(
+                              onTap: () async{
+                                if (await getLive()) {
+                                   Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (builder) => CallScreen(
                                       name: name,
@@ -394,6 +505,10 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
                                     ),
                                   ),
                                 );
+                                }
+                                if (!await getLive()) {
+                                  ShowSnakbar().showSnackbar('Please allow location', Colors.red, context);
+                                }
                               },
                               context: context,
                             ),

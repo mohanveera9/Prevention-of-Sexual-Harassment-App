@@ -5,6 +5,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:posh/Screens/Home/SOS/sos.dart';
+import 'package:posh/Widgets/show_snakbar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class VideoRecorderScreen extends StatefulWidget {
@@ -19,11 +21,47 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
   bool _isRecording = false;
   bool isLoading = false;
   int _secondsElapsed = 0;
+  String _lag = "";
+  String _lat = "";
 
   @override
   void initState() {
     super.initState();
+    _getLiveLocation();
     _initializeCameras();
+  }
+
+  //Location
+  Future<void> _getLiveLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        await Geolocator.openLocationSettings();
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        return;
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        permission = await Geolocator.requestPermission();
+        return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      setState(() {
+        _lat = position.latitude.toString();
+        _lag = position.longitude.toString();
+      });
+    } catch (e) {
+      ShowSnakbar().showSnackbar('No internet...', Colors.red, context);
+    }
   }
 
   //Token
@@ -156,8 +194,7 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
         final jsonResponse = json.decode(responseBody);
         final secureUrl = jsonResponse['secure_url'] as String;
         print('Uploaded Video URL: $secureUrl');
-        Position position = await _getLocation();
-        _sendLocationToApi(position.latitude, position.longitude, secureUrl);
+        _sendLocationToApi(_lat, _lag, secureUrl);
       } else {
         final responseBody = await response.stream.bytesToString();
         print('Upload failed with response: $responseBody');
@@ -175,27 +212,9 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
     return null;
   }
 
-  //Location
-  Future<Position> _getLocation() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      throw Exception("Location services are disabled.");
-    }
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        throw Exception("Location permission denied.");
-      }
-    }
-    return await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-  }
-
   //Send Loaction and audio
   Future<void> _sendLocationToApi(
-      double latitude, double longitude, String path) async {
+      String latitude, String longitude, String path) async {
     if (!mounted) return; // Ensure widget is still mounted
     final token = await getToken();
     var url = Uri.parse(
@@ -222,13 +241,11 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
         _showPopup("Video & Location sent successfully!", autoClose: true);
       } else {
         final responseBody = jsonDecode(response.body);
-        _showPopup(
-            "Failed to send Video & Location: ${response.statusCode} - ${responseBody['message']}",
-            autoClose: true);
+        _showPopup("Failed to send Video & Location", autoClose: true);
       }
     } catch (e) {
       if (!mounted) return; // Check again after async operation
-      _showPopup("Error occurred: $e", autoClose: true);
+      _showPopup("Error occurred", autoClose: true);
     }
   }
 
@@ -242,6 +259,15 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
           Future.delayed(Duration(seconds: 2), () {
             if (Navigator.canPop(context)) {
               Navigator.pop(context);
+              if (message == 'Video & Location sent successfully!' ||
+                  message == "Failed to send Video & Location" ||
+                  message == 'Error occurred') {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (builder) => Sos(),
+                  ),
+                );
+              }
             }
           });
         }
@@ -283,7 +309,7 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
-       onWillPop: () async{
+      onWillPop: () async {
         return _secondsElapsed >= 20;
       },
       child: Scaffold(
@@ -297,7 +323,7 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
               Positioned.fill(
                 child: CameraPreview(_controller!),
               ),
-      
+
             // Display the recording timer and status
             if (_isRecording)
               Positioned(
