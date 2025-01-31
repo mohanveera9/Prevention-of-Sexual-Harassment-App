@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -29,11 +30,95 @@ class _MainscreenState extends State<Mainscreen> {
   bool isLoadingUser = false;
   bool hasError = false;
   final PageController _pageController = PageController();
+
   final List<Widget> pages = [Home(), Sos(), Profile()];
 
   Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('auth_token');
+  }
+
+  Future<void> requestPermissions() async {
+    Map<Permission, PermissionStatus> statuses = await [
+      Permission.microphone,
+      Permission.camera,
+    ].request();
+
+    // Handle permission results
+    if (statuses[Permission.microphone]?.isDenied ?? false) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Microphone permission denied.')),
+      );
+    }
+
+    if (statuses[Permission.camera]?.isDenied ?? false) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Camera permission denied.')),
+      );
+    }
+  }
+
+  Future<void> fetchAndSetLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // Check if location services are enabled
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      Provider.of<Locationmodel>(context, listen: false).SetLocation(
+        lat: '0.0',
+        lag: '0.0',
+        status: false,
+        message: 'Location services are disabled.',
+      );
+      return;
+    }
+
+    // Check for location permissions
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        Provider.of<Locationmodel>(context, listen: false).SetLocation(
+          lat: '0.0',
+          lag: '0.0',
+          status: false,
+          message: 'Location permission denied.',
+        );
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      Provider.of<Locationmodel>(context, listen: false).SetLocation(
+        lat: '0.0',
+        lag: '0.0',
+        status: false,
+        message: 'Location permissions are permanently denied.',
+      );
+      return;
+    }
+
+    // Get the current location
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      Provider.of<Locationmodel>(context, listen: false).SetLocation(
+        lat: position.latitude.toString(),
+        lag: position.longitude.toString(),
+        status: true,
+        message: 'Location fetched successfully.',
+      );
+    } catch (e) {
+      Provider.of<Locationmodel>(context, listen: false).SetLocation(
+        lat: '0.0',
+        lag: '0.0',
+        status: false,
+        message: 'Error fetching location',
+      );
+    }
   }
 
   Future<void> fetchUser() async {
@@ -74,9 +159,35 @@ class _MainscreenState extends State<Mainscreen> {
   @override
   void initState() {
     super.initState();
+
+    // Fetch and set initial location
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      fetchUserWithShimmer();
+      fetchAndSetLocation();
+      requestPermissions();
     });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final token = await getToken();
+      if (token != null) {
+        // Set the token in the DataProvider
+        Provider.of<DataProvider>(context, listen: false).setToken(token);
+
+        // Fetch data using the token
+        Provider.of<DataProvider>(context, listen: false).fetchData();
+      }
+    });
+
+    if (!widget.isLoading) {
+      fetchUserWithShimmer();
+    } else {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      if (userProvider.user != null) {
+        Provider.of<UserModel>(context, listen: false).setUserDetails(
+          name: userProvider.user!.username,
+          primary: userProvider.user!.primarySos,
+        );
+      }
+    }
   }
 
   @override
@@ -101,7 +212,8 @@ class _MainscreenState extends State<Mainscreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue,
                         ),
-                        child: Text('Retry', style: TextStyle(color: Colors.white)),
+                        child: Text('Retry',
+                            style: TextStyle(color: Colors.white)),
                       ),
                     ],
                   ),
@@ -109,21 +221,30 @@ class _MainscreenState extends State<Mainscreen> {
               : PageView(
                   controller: _pageController,
                   onPageChanged: (index) {
-                    setState(() => currentPage = index);
+                    setState(() {
+                      currentPage = index;
+                    });
                   },
                   children: pages,
                 ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.redAccent,
         shape: CircleBorder(),
         onPressed: () {
           _pageController.jumpToPage(1);
-          setState(() => currentPage = 1);
+          setState(() {
+            currentPage = 1;
+          });
         },
-        child: Icon(Icons.sos, color: Colors.white),
+        child: Icon(
+          Icons.sos,
+          color: Colors.white,
+        ),
       ),
       bottomNavigationBar: BottomAppBar(
         padding: EdgeInsets.symmetric(horizontal: 45),
+        surfaceTintColor: Colors.transparent,
         height: 60,
         color: Color.fromARGB(255, 30, 123, 179),
         shape: CircularNotchedRectangle(),
@@ -134,7 +255,9 @@ class _MainscreenState extends State<Mainscreen> {
             IconButton(
               onPressed: () {
                 _pageController.jumpToPage(0);
-                setState(() => currentPage = 0);
+                setState(() {
+                  currentPage = 0;
+                });
               },
               icon: Icon(
                 Icons.home,
@@ -144,7 +267,9 @@ class _MainscreenState extends State<Mainscreen> {
             IconButton(
               onPressed: () {
                 _pageController.jumpToPage(2);
-                setState(() => currentPage = 2);
+                setState(() {
+                  currentPage = 2;
+                });
               },
               icon: Icon(
                 Icons.person,

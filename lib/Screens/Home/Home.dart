@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:posh/Model/DataProvider.dart';
 import 'package:posh/Model/userModel/userModel.dart';
 import 'package:posh/Model/userProvider.dart';
 import 'package:posh/Screens/Home/HomeShimmer.dart';
@@ -220,6 +221,16 @@ class _HomeState extends State<Home> {
     // TODO: implement initState
     super.initState();
     _getLiveLocation();
+     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final token = await getToken();
+      if (token != null) {
+        // Set the token in the DataProvider
+        Provider.of<DataProvider>(context, listen: false).setToken(token);
+
+        // Fetch data using the token
+        Provider.of<DataProvider>(context, listen: false).fetchData();
+      }
+    });
     _locationTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       _getLiveLocation();
     });
