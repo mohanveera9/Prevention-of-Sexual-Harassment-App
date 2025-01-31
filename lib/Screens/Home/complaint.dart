@@ -425,6 +425,7 @@ class _ComplaintState extends State<Complaint> {
           selectedAdditionalType = null;
           isAnonymous = false;
         });
+        Navigator.of(context).pop();
       } else {
         // Error: Show error Snackbar
         ScaffoldMessenger.of(context).showSnackBar(

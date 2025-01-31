@@ -38,23 +38,25 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
     )..repeat(reverse: false);
   }
 
-  Future<void> getLive() async {
+  Future<bool> getLive() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       await Geolocator.openLocationSettings();
       ShowSnakbar().showSnackbar('Turn on location', Colors.red, context);
-      return;
+      return false;
     }
 
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        ShowSnakbar().showSnackbar('Allow location', Colors.red, context);
-        return;
+        ShowSnakbar()
+            .showSnackbar('Please allow location', Colors.red, context);
+        return false;
       }
     }
-  }
 
+    return true;
+  }
 
   //Token
   Future<String?> getToken() async {
@@ -148,88 +150,6 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
     );
   } //Pop pup for counter
 
-  void _showCountdownPopup(VoidCallback onConfirm) {
-    int countdown = 3;
-    Timer? timer;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setState) {
-            // Start the timer when the dialog is created
-            timer ??= Timer.periodic(Duration(seconds: 1), (timer) {
-              if (countdown == 1) {
-                timer.cancel();
-                if (Navigator.canPop(dialogContext)) {
-                  Navigator.pop(dialogContext); // Close the popup safely
-                }
-                onConfirm(); // Trigger the confirmation callback
-              } else {
-                setState(() {
-                  countdown--;
-                });
-              }
-            });
-            return AlertDialog(
-              backgroundColor: Colors.transparent,
-              contentPadding: EdgeInsets.zero,
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Circular Countdown
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      '$countdown',
-                      style: const TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Cancel Button
-                  IconButton(
-                    onPressed: () {
-                      timer?.cancel(); // Cancel the timer
-                      if (Navigator.canPop(dialogContext)) {
-                        Navigator.pop(dialogContext); // Close the dialog safely
-                      }
-                      // Stop recording audio if recording
-                      if (isRecording) {
-                        audioRecorder.stop();
-                        setState(() {
-                          isRecording = false;
-                        });
-                      }
-                    },
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.white,
-                    ),
-                    iconSize: 30,
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    ).then((_) {
-      // Ensure timer is canceled when the dialog is dismissed
-      timer?.cancel();
-    });
-  }
 
   Timer? _countdownTimer;
   int _countdown = 3;
@@ -297,9 +217,6 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
     });
   }
 
-  void _performEmergencyTask() {
-    ShowSnakbar().showSnackbar('message', Colors.green, context);
-  }
 
   @override
   void dispose() {
@@ -398,11 +315,11 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
                           child: Column(
                             children: [
                               GestureDetector(
-                                onTap: () => _showCountdownDialog(
-                                  context,
-                                  _performEmergencyTask,
-                                  'Send your location in'
-                                ),
+                                onTap: () async{
+                                  if (await getLive()) {
+                                    _showCountdownDialog(context, , text)
+                                  }
+                                },
                                 child: Stack(
                                   alignment: Alignment.center,
                                   children: [
@@ -461,9 +378,7 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
                                           VideoRecorderScreen(),
                                     ),
                                   );
-                                },
-                                'Video recording started in'
-                                );
+                                }, 'Video recording started in');
                               },
                               context: context,
                             ),

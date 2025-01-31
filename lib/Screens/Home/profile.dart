@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:posh/Model/userModel/userModel.dart';
 import 'package:posh/Model/userProvider.dart';
@@ -23,10 +24,13 @@ class _ProfileState extends State<Profile> {
   bool _isLoadingSos = false;
   late TextEditingController _nameController;
   late TextEditingController _primaryController;
+  String _lat = '';
+  String _lag = '';
 
   @override
   void initState() {
     super.initState();
+    _getLiveLocation();
     final userModel = Provider.of<UserModel>(context, listen: false);
     _nameController = TextEditingController(text: userModel.name);
     _primaryController = TextEditingController(text: userModel.primary);
@@ -48,7 +52,8 @@ class _ProfileState extends State<Profile> {
     if (name.isEmpty) {
       final userModel = Provider.of<UserModel>(context, listen: false);
       _nameController.text = userModel.name;
-      ShowSnakbar().showSnackbar('Username cannot be empty.', Colors.red, context);
+      ShowSnakbar()
+          .showSnackbar('Username cannot be empty.', Colors.red, context);
 
       return;
     }
@@ -78,17 +83,21 @@ class _ProfileState extends State<Profile> {
         final userModel = Provider.of<UserModel>(context, listen: false);
         userModel.updateName(name);
         _nameController.text = name; // Update the text controller
-        ShowSnakbar().showSnackbar('Name updated successfully.', Colors.green, context);
+        ShowSnakbar()
+            .showSnackbar('Name updated successfully.', Colors.green, context);
       } else {
         final userModel = Provider.of<UserModel>(context, listen: false);
         _nameController.text = userModel.name;
-        ShowSnakbar().showSnackbar('Failed to update name.', Colors.red, context);
+        ShowSnakbar()
+            .showSnackbar('Failed to update name.', Colors.red, context);
       }
     } catch (e) {
       final userModel = Provider.of<UserModel>(context, listen: false);
       _nameController.text = userModel.name;
-      ShowSnakbar().showSnackbar( 'An error occurred. Check your connection and try again.',
-          Colors.red, context);
+      ShowSnakbar().showSnackbar(
+          'An error occurred. Check your connection and try again.',
+          Colors.red,
+          context);
     } finally {
       setState(() {
         _isLoadingName = false;
@@ -100,14 +109,16 @@ class _ProfileState extends State<Profile> {
     if (number.isEmpty) {
       final userModel = Provider.of<UserModel>(context, listen: false);
       _primaryController.text = userModel.primary;
-      ShowSnakbar().showSnackbar('Primary Number cannot be empty.', Colors.red, context);
+      ShowSnakbar()
+          .showSnackbar('Primary Number cannot be empty.', Colors.red, context);
       return;
     }
 
     if (number.length != 10) {
       final userModel = Provider.of<UserModel>(context, listen: false);
       _primaryController.text = userModel.primary;
-      ShowSnakbar().showSnackbar('Enter a valid 10-digit number.', Colors.red, context);
+      ShowSnakbar()
+          .showSnackbar('Enter a valid 10-digit number.', Colors.red, context);
       return;
     }
 
@@ -115,7 +126,8 @@ class _ProfileState extends State<Profile> {
     if (!regEx.hasMatch(number)) {
       final userModel = Provider.of<UserModel>(context, listen: false);
       _primaryController.text = userModel.primary;
-      ShowSnakbar().showSnackbar('Enter a valid 10-digit number.', Colors.red, context);
+      ShowSnakbar()
+          .showSnackbar('Enter a valid 10-digit number.', Colors.red, context);
       return;
     }
 
@@ -190,6 +202,43 @@ class _ProfileState extends State<Profile> {
     final char = name[0].toUpperCase();
     final index = char.codeUnitAt(0) % colors.length;
     return colors[index];
+  }
+
+  Future<void> _getLiveLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        await Geolocator.openLocationSettings();
+        ShowSnakbar().showSnackbar('Trun on location', Colors.red, context);
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        ShowSnakbar()
+            .showSnackbar('Please allow location', Colors.red, context);
+        return;
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        permission = await Geolocator.requestPermission();
+        ShowSnakbar()
+            .showSnackbar('Please allow location', Colors.red, context);
+        return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      setState(() {
+        _lat = position.latitude.toString();
+        _lag = position.longitude.toString();
+      });
+    } catch (e) {
+      ShowSnakbar().showSnackbar('No internet...', Colors.red, context);
+    }
   }
 
   @override
@@ -432,6 +481,8 @@ class _ProfileState extends State<Profile> {
       ],
     );
   }
+
+  
 
   Widget _buildSignOutButton(BuildContext context) {
     return SizedBox(

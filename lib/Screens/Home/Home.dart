@@ -173,13 +173,13 @@ class _HomeState extends State<Home> {
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        ShowSnakbar().showSnackbar('Allow location', Colors.red, context);
+        ShowSnakbar().showSnackbar('Please allow location', Colors.red, context);
         return;
       }
 
       if (permission == LocationPermission.deniedForever) {
         permission = await Geolocator.requestPermission();
-        ShowSnakbar().showSnackbar('Allow location', Colors.red, context);
+        ShowSnakbar().showSnackbar('Please allow location', Colors.red, context);
         return;
       }
 
@@ -207,7 +207,7 @@ class _HomeState extends State<Home> {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        ShowSnakbar().showSnackbar('Allow location', Colors.red, context);
+        ShowSnakbar().showSnackbar('Please allow location', Colors.red, context);
         return false;
       }
     }
@@ -277,6 +277,9 @@ class _HomeState extends State<Home> {
                             onTap: () async {
                               if (await getLive()) {
                                 _showCountdownDialog(context, _lat, _lag);
+                              }
+                              if (!await getLive()) {
+                                 ShowSnakbar().showSnackbar('Please allow location', Colors.red, context);
                               }
                             },
                             child: Stack(
