@@ -89,6 +89,9 @@ class _ComplaintState extends State<Complaint> {
     ],
   };
 
+  String? selectedValue;
+  List<String> items = ["Academics","Hostel"];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -125,10 +128,48 @@ class _ComplaintState extends State<Complaint> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.only(left: 20.0, right: 20, bottom: 20, top: 30),
+              padding: const EdgeInsets.only(
+                  left: 20.0, right: 20, bottom: 20, top: 30),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text(
+                    "Related to:",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black.withOpacity(0.7),
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey),
+                    ),
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: selectedValue,
+                      underline: SizedBox(),
+                      hint: Text('Select category'),
+                      items: items.map((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          selectedValue = newValue;
+                        });
+                      },
+                    ),
+                  ),
+
+                  SizedBox(height: 20),
+
                   // Complaint Type Dropdown
                   Text(
                     "Complaint Type:",
@@ -316,6 +357,10 @@ class _ComplaintState extends State<Complaint> {
   }
 
   Future<void> _validateAndSendComplaint() async {
+    if (selectedValue == null) {
+      _showSnackbar('Please select a related.');
+      return;
+    }
     // Check if all required fields are filled
     if (selectedComplaintType == null) {
       _showSnackbar('Please select a complaint type.');
@@ -373,6 +418,7 @@ class _ComplaintState extends State<Complaint> {
 
     // Prepare the complaint data
     Map<String, dynamic> complaintData = {
+      'section' : selectedValue,
       'statement': statementController.text,
       'description': descriptionController.text,
       'category': selectedComplaintCategory ?? "",
