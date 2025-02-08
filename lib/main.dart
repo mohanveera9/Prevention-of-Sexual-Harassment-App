@@ -1,22 +1,27 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:posh/Model/ConnectivityProvider.dart';
 import 'package:posh/Model/DataProvider.dart';
 import 'package:posh/Model/LocationModel.dart';
 import 'package:posh/Model/userModel/userModel.dart';
 import 'package:posh/Model/userProvider.dart';
-import 'package:posh/Screens/Home/HomeShimmer.dart';
 import 'package:posh/Screens/Home/mainScreen.dart';
 import 'package:posh/Screens/Login/loginMain.dart';
+import 'package:posh/firebase_options.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
+void main() async{
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => UserProvider()),
         ChangeNotifierProvider(create: (context) => UserModel()),
         ChangeNotifierProvider(create: (context) => DataProvider()),
-        ChangeNotifierProvider(create: (context) => Locationmodel())
+        ChangeNotifierProvider(create: (context) => Locationmodel()),
+        ChangeNotifierProvider(create: (context) => ConnectivityProvider()),
       ],
       child: const MyApp(),
     ),

@@ -3,10 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:permission_handler/permission_handler.dart';
+import 'package:posh/Model/connectivity_wrapper.dart';
 import 'package:posh/Model/userModel/userModel.dart';
 import 'package:posh/Screens/Home/SOS/FakeCall/call.dart';
 import 'package:posh/Screens/Home/SOS/VideoRecorder.dart';
-import 'package:posh/Screens/Home/SOS/soshelp.dart';
 import 'package:posh/Widgets/show_snakbar.dart';
 import 'package:posh/Widgets/sos_button.dart';
 import 'package:provider/provider.dart';
@@ -21,7 +22,8 @@ class Sos extends StatefulWidget {
   _SosState createState() => _SosState();
 }
 
-class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
+class _SosState extends State<Sos>
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   late AnimationController _controller;
   final AudioRecorder audioRecorder = AudioRecorder();
   bool isRecording = false;
@@ -29,10 +31,12 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
   bool isLoading = false;
   String _lat = '';
   String _lag = '';
+  bool _isWaitingForSettings = false; // Add this flag
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     getLive();
     _getLiveLocation();
     _controller = AnimationController(
@@ -41,10 +45,19 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
     )..repeat(reverse: false);
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _controller.dispose();
+    _countdownTimer?.cancel();
+    super.dispose();
+  }
+
+//for live ture or false
   Future<bool> getLive() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       await Geolocator.openLocationSettings();
-      ShowSnakbar().showSnackbar('Turn on location', Colors.red, context);
+      ShowSnackbar().showSnackbar('Turn on location', Colors.red, context);
       return false;
     }
 
@@ -52,7 +65,7 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        ShowSnakbar()
+        ShowSnackbar()
             .showSnackbar('Please allow location', Colors.red, context);
         return false;
       }
@@ -67,26 +80,28 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
     return prefs.getString('auth_token');
   }
 
-  //Location
+  //for live Location
   Future<void> _getLiveLocation() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         await Geolocator.openLocationSettings();
-        ShowSnakbar().showSnackbar('Trun on location', Colors.red, context);
+        ShowSnackbar().showSnackbar('Trun on location', Colors.red, context);
         return;
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        ShowSnakbar().showSnackbar('Please allow location', Colors.red, context);
+        ShowSnackbar()
+            .showSnackbar('Please allow location', Colors.red, context);
         return;
       }
 
       if (permission == LocationPermission.deniedForever) {
         permission = await Geolocator.requestPermission();
-        ShowSnakbar().showSnackbar('Please allow location', Colors.red, context);
+        ShowSnackbar()
+            .showSnackbar('Please allow location', Colors.red, context);
         return;
       }
 
@@ -99,21 +114,17 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
         _lag = position.longitude.toString();
       });
     } catch (e) {
-      ShowSnakbar().showSnackbar('No internet...', Colors.red, context);
+      ShowSnackbar().showSnackbar('No internet...', Colors.red, context);
     }
   }
 
-
   //SendLoaction
-  Future<void> _sendLocation(String latitude, String longitude) async {
-    final token = await getToken();
-    var url = Uri.parse(
+  Future<void> sendLocation(String lat, String lag) async {
+    final url = Uri.parse(
         'https://tech-hackathon-glowhive.onrender.com/api/user/sos/submit');
+    final token = await getToken();
 
     try {
-      // Show "Location is sending..." dialog
-      _showPopup("Location is sending...");
-
       var response = await http.post(
         url,
         headers: {
@@ -121,60 +132,35 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
           'Authorization': 'Bearer $token',
         },
         body: json.encode({
-          "location": [latitude, longitude],
+          "location": [lat, lag],
         }),
       );
 
-      // ignore: use_build_context_synchronously
-      Navigator.pop(context); // Close the popup
-      print(response.body);
+      if (mounted) {
+        Navigator.of(context).pop(); // Close the sending dialog
+      }
+
       if (response.statusCode == 200) {
-        _showPopup("Location sent successfully!", autoClose: true);
+        ShowSnackbar()
+            .showSnackbar('Location Sent Successfully', Colors.green, context);
       } else {
-        _showPopup("Failed to send location: ${response.statusCode}");
+        ShowSnackbar().showSnackbar(
+            'Error occurred, Please try again', Colors.red, context);
       }
     } catch (e) {
-      // ignore: use_build_context_synchronously
-      Navigator.pop(context); // Close the popup in case of error
-      _showPopup("Error occurred: $e");
-    } finally {}
+      if (mounted) {
+        Navigator.of(context).pop(); // Close the sending dialog
+      }
+      ShowSnackbar()
+          .showSnackbar('Check your internet connection', Colors.red, context);
+    }
   }
 
-  //Pop up for Loaction
-  _showPopup(String message, {bool autoClose = false}) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        if (autoClose) {
-          Future.delayed(Duration(seconds: 2), () {
-            // ignore: use_build_context_synchronously
-            if (Navigator.canPop(context)) {
-              // ignore: use_build_context_synchronously
-              Navigator.pop(context);
-            }
-          });
-        }
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          backgroundColor: Colors.white,
-          content: Text(
-            message,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
-          ),
-        );
-      },
-    );
-  } //Pop pup for counter
-
+  //Pop pup for counter
 
   Timer? _countdownTimer;
   int _countdown = 3;
-
+//for video
   void _showCountdownDialog(
       BuildContext context, VoidCallback onConfirm, String text) {
     _countdown = 3; // Reset the countdown every time the dialog is opened
@@ -238,8 +224,9 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
     });
   }
 
+//for location
   void _showCountdownDialog1(
-      BuildContext context,String lat, String lag, String text) {
+      BuildContext context, String lat, String lag, String text) {
     _countdown = 3; // Reset the countdown every time the dialog is opened
     bool isDialogActive = true; // Track dialog state
 
@@ -262,7 +249,7 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
                     isDialogActive = false; // Mark dialog as closed
                     Navigator.of(context).pop(); // Close the dialog
                     _showSendingDialog(context);
-                    _sendLocation(lat, lag);
+                    sendLocation(lat, lag);
                   }
                 });
               }
@@ -302,7 +289,8 @@ class _SosState extends State<Sos> with SingleTickerProviderStateMixin {
     });
   }
 
-void _showSendingDialog(BuildContext context) {
+//after location
+  void _showSendingDialog(BuildContext context) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -310,15 +298,15 @@ void _showSendingDialog(BuildContext context) {
         return AlertDialog(
           title: Text(
             'Sending Location...',
-            style: TextStyle(
-              fontSize: 20
-            ),
+            style: TextStyle(fontSize: 20),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const CircularProgressIndicator(),
-              SizedBox(height: 10,)
+              SizedBox(
+                height: 10,
+              )
             ],
           ),
         );
@@ -326,13 +314,81 @@ void _showSendingDialog(BuildContext context) {
     );
   }
 
+// Check and request audio permission for fake call
+  Future<bool> checkAudioPermission(BuildContext context) async {
+    var status = await Permission.microphone.status;
+    if (status.isGranted) {
+      return true;
+    } else if (status.isDenied) {
+      status = await Permission.microphone.request();
+      return status.isGranted;
+    } else if (status.isPermanentlyDenied) {
+      _showSettingsDialog(context, "Microphone");
+      return false;
+    }
+    return false;
+  }
 
+// Check and request camera permission for video recording
+  Future<bool> checkCameraPermission(BuildContext context) async {
+    var status = await Permission.camera.status;
+    if (status.isGranted) {
+      return true;
+    } else if (status.isDenied) {
+      status = await Permission.camera.request();
+      return status.isGranted;
+    } else if (status.isPermanentlyDenied) {
+      _showSettingsDialog(context, "Camera");
+      return false;
+    }
+    return false;
+  }
+
+// Show settings dialog if permission is permanently denied
+  void _showSettingsDialog(BuildContext context, String permissionType) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('$permissionType Permission Required'),
+        content: Text(
+            'This feature requires access to your $permissionType. Please enable it in settings.'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context); // Close the dialog
+              setState(() {
+                _isWaitingForSettings = true; // Set the flag
+              });
+              await openAppSettings(); // Open app settings
+            },
+            child: Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    _countdownTimer?.cancel();
-    super.dispose();
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _isWaitingForSettings) {
+      // User returned from settings
+      setState(() {
+        _isWaitingForSettings = false; // Reset the flag
+      });
+      checkPermissionsAndUpdateUI(); // Check permissions and update UI
+    }
+  }
+
+  void checkPermissionsAndUpdateUI() async {
+   setState(() {
+     
+   });
   }
 
   @override
@@ -342,213 +398,221 @@ void _showSendingDialog(BuildContext context) {
     final phno = userModel.primary;
     final name1 = userModel.name;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 30, right: 30, top: 40),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Welcome',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w500,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                        Text(
-                          name1,
-                          style: TextStyle(
-                            fontSize: 17,
-                            color: Colors.black.withOpacity(0.8),
-                            fontWeight: FontWeight.w400,
-                          ),
-                        )
-                      ],
-                    ),
-                    Container(
-                      height: 60,
-                      width: 60,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Color(0xFF6BF3DD), // Start color
-                            Color(0xFF39D0D1), // Midpoint color
-                            Color(0xFF39D0D1),
-                            Color(0xFF0C3F9E),
-                            Color(0xFF0C3F9E), // End color
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(50),
-                      ),
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/img/app_icon.png',
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    )
-                  ],
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 30.0, vertical: 30),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Center(
-                          child: Text(
-                            'Emergency help Needed?',
-                            textAlign: TextAlign.center,
+    return ConnectivityWrapper(
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Stack(
+          children: [
+            Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 30, right: 30, top: 40),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Welcome',
                             style: TextStyle(
-                              fontSize: 30,
-                              color: Colors.black.withOpacity(0.6),
+                              fontSize: 20,
                               fontWeight: FontWeight.w500,
+                              color: Theme.of(context).colorScheme.primary,
                             ),
                           ),
+                          Text(
+                            name1,
+                            style: TextStyle(
+                              fontSize: 17,
+                              color: Colors.black.withOpacity(0.8),
+                              fontWeight: FontWeight.w400,
+                            ),
+                          )
+                        ],
+                      ),
+                      Container(
+                        height: 60,
+                        width: 60,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Color(0xFF6BF3DD), // Start color
+                              Color(0xFF39D0D1), // Midpoint color
+                              Color(0xFF39D0D1),
+                              Color(0xFF0C3F9E),
+                              Color(0xFF0C3F9E), // End color
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(50),
                         ),
-                        const SizedBox(height: 20),
-                        Center(
-                          child: Column(
+                        child: ClipOval(
+                          child: Image.asset(
+                            'assets/img/app_icon.png',
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      )
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 30.0, vertical: 30),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Center(
+                            child: Text(
+                              'Emergency help Needed?',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 30,
+                                color: Colors.black.withOpacity(0.6),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Center(
+                            child: Column(
+                              children: [
+                                GestureDetector(
+                                  onTap: () async {
+                                    if (await getLive()) {
+                                      _showCountdownDialog1(context, _lat, _lag,
+                                          "Send you location in");
+                                    }
+                                  },
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      Container(
+                                        height: 120,
+                                        width: 120,
+                                        decoration: BoxDecoration(
+                                          color: Colors.red,
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color:
+                                                  Colors.red.withOpacity(0.5),
+                                              blurRadius: 2,
+                                              spreadRadius: 4,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Image.asset(
+                                        'assets/img/wifi.png',
+                                        height: 60,
+                                        width: 60,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 30),
+                                Text(
+                                  'Press the button to send location',
+                                  style: TextStyle(
+                                      fontSize: 16, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          GridView(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                              childAspectRatio: 1,
+                            ),
                             children: [
-                              GestureDetector(
-                                onTap: () async{
-                                  if (await getLive()) {
-                                    _showCountdownDialog1(context, _lat, _lag, "Send you location in");
+                              SosButton(
+                                icon: Icons.video_camera_back,
+                                label: 'Video\nRecording',
+                                onTap: () async {
+                                  if (await checkCameraPermission(context)) {
+                                    _showCountdownDialog(context, () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (builder) =>
+                                              VideoRecorderScreen(),
+                                        ),
+                                      );
+                                    }, 'Video recording started in');
                                   }
                                 },
-                                child: Stack(
-                                  alignment: Alignment.center,
-                                  children: [
-                                    Container(
-                                      height: 120,
-                                      width: 120,
-                                      decoration: BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.red.withOpacity(0.5),
-                                            blurRadius: 2,
-                                            spreadRadius: 4,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Image.asset(
-                                      'assets/img/wifi.png',
-                                      height: 60,
-                                      width: 60,
-                                    ),
-                                  ],
-                                ),
+                                context: context,
                               ),
-                              const SizedBox(height: 30),
-                              Text(
-                                'Press the button to send location',
-                                style:
-                                    TextStyle(fontSize: 16, color: Colors.grey),
+                              SosButton(
+                                icon: Icons.call,
+                                label: 'Audio\nCall',
+                                onTap: () async {
+                                  if (await checkAudioPermission(context)) {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (builder) => CallScreen(
+                                          name: name,
+                                          phno: phno,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                                context: context,
                               ),
                             ],
                           ),
-                        ),
-                        const SizedBox(height: 20),
-                        GridView(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
-                            childAspectRatio: 1,
+                          const SizedBox(height: 20),
+                          RichText(
+                            textAlign: TextAlign.start,
+                            text: TextSpan(
+                              children: [
+                                TextSpan(
+                                  text:
+                                      'Note:\n\n1. Enabling location access is crucial for sending accurate emergency alerts. Please ensure that your location services are turned on.\n\n',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                TextSpan(
+                                  text:
+                                      '2. Audio call functionality is only available when you grant permission for microphone access.\n\n',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                TextSpan(
+                                  text:
+                                      '3. Video call functionality requires camera access. Please enable camera permissions for a seamless experience.\n\n',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                TextSpan(
+                                  text:
+                                      '4. If you denied any of the necessary permissions, kindly go to the app settings allow permissions \n\n',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                              ],
+                            ),
                           ),
-                          children: [
-                            SosButton(
-                              icon: Icons.video_camera_back,
-                              label: 'Video\nRecording',
-                              onTap: () {
-                                _showCountdownDialog(context, () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (builder) =>
-                                          VideoRecorderScreen(),
-                                    ),
-                                  );
-                                }, 'Video recording started in');
-                              },
-                              context: context,
-                            ),
-                            SosButton(
-                              icon: Icons.call,
-                              label: 'Audio\nCall',
-                              onTap: () async{
-                                if (await getLive()) {
-                                   Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (builder) => CallScreen(
-                                      name: name,
-                                      phno: phno,
-                                    ),
-                                  ),
-                                );
-                                }
-                                if (!await getLive()) {
-                                  ShowSnakbar().showSnackbar('Please allow location', Colors.red, context);
-                                }
-                              },
-                              context: context,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          Positioned(
-            bottom: 20,
-            right: 20,
-            child: GestureDetector(
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (builder) => Soshelp(),
-                  ),
-                );
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  borderRadius: BorderRadius.circular(50),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Icon(
-                    Icons.help_outline,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
+              ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

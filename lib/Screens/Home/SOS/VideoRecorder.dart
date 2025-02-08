@@ -5,7 +5,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:posh/Screens/Home/SOS/sos.dart';
+import 'package:posh/Model/connectivity_wrapper.dart';
+import 'package:posh/Screens/Home/mainScreen.dart';
 import 'package:posh/Widgets/show_snakbar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -60,7 +61,7 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
         _lag = position.longitude.toString();
       });
     } catch (e) {
-      ShowSnakbar().showSnackbar('No internet...', Colors.red, context);
+      ShowSnackbar().showSnackbar('No internet...', Colors.red, context);
     }
   }
 
@@ -77,13 +78,13 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
         if (_cameras.isNotEmpty) {
           _initializeCameraController(_cameras[0]);
         } else {
-          _showMessage('No cameras available on this device.');
+          _showMessage('No cameras available on this device.', Colors.red);
         }
       } catch (e) {
-        _showMessage('Error initializing cameras: $e');
+        _showMessage('Error initializing cameras: $e', Colors.red);
       }
     } else {
-      _showMessage('Camera permission denied.');
+      _showMessage('Camera permission denied.', Colors.red);
     }
   }
 
@@ -92,7 +93,8 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
     if (status.isGranted) {
       return true;
     } else if (status.isDenied) {
-      _showMessage('Camera permission denied. Please enable it in settings.');
+      _showMessage('Camera permission denied. Please enable it in settings.',
+          Colors.red);
     } else if (status.isPermanentlyDenied) {
       openAppSettings();
     }
@@ -112,18 +114,21 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
       });
       _startRecording();
     } catch (e) {
-      _showMessage('Error initializing camera: $e');
+      _showMessage('Error initializing camera: $e', Colors.red);
+      Navigator.pop(context);
     }
   }
 
   Future<void> _startRecording() async {
     if (_controller == null || !_controller!.value.isInitialized) {
-      _showMessage('Camera is not initialized.');
+      _showMessage('Camera is not initialized.', Colors.red);
+      Navigator.pop(context);
       return;
     }
 
     if (_controller!.value.isRecordingVideo) {
-      _showMessage('Already recording.');
+      _showMessage('Already recording.', Colors.red);
+      Navigator.pop(context);
       return;
     }
 
@@ -132,16 +137,17 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
       setState(() {
         _isRecording = true;
       });
-      _showMessage('Video recording started.');
+      _showMessage('Video recording started.', Colors.green);
       _startTimer();
     } catch (e) {
-      _showMessage('Error starting video recording: $e');
+      _showMessage('Error starting video recording: $e', Colors.red);
+      Navigator.pop(context);
     }
   }
 
   Future<void> _stopRecording() async {
     if (_controller == null || !_controller!.value.isRecordingVideo) {
-      _showMessage('No video recording in progress.');
+      _showMessage('No video recording in progress.', Colors.red);
       return;
     }
 
@@ -154,6 +160,7 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
       print('Video recorded to: ${videoFile.path}');
 
       // Upload the video to Cloudinary
+      _showSendingDialog(context);
       final cloudinaryUrl =
           await _uploadVideoToCloudinary(File(videoFile.path));
       if (cloudinaryUrl != null) {
@@ -164,6 +171,30 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
     } catch (e) {
       print('Error stopping video recording: $e');
     }
+  }
+
+  void _showSendingDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(
+            'Sending Video...',
+            style: TextStyle(fontSize: 20),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              SizedBox(
+                height: 10,
+              )
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<String?> _uploadVideoToCloudinary(File videoFile) async {
@@ -198,11 +229,13 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
       } else {
         final responseBody = await response.stream.bytesToString();
         print('Upload failed with response: $responseBody');
-        _showMessage('Error occurd');
+        _showMessage('Error occurd', Colors.red);
+        Navigator.pop(context);
       }
     } catch (e) {
       print('Error uploading video: $e');
-      _showMessage("check your interent connection");
+      _showMessage("check your interent connection", Colors.red);
+      Navigator.pop(context);
     } finally {
       setState(() {
         isLoading = false;
@@ -221,7 +254,6 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
         'https://tech-hackathon-glowhive.onrender.com/api/user/sos/submit');
 
     try {
-      _showPopup("Sending Video and Location...", autoClose: false);
       final body = jsonEncode({
         "location": [latitude, longitude],
         "videoLink": path,
@@ -234,60 +266,34 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
         },
         body: body,
       );
-      if (!mounted) return; // Check again after async operation
+      print(body);
+      if (mounted) {
+        Navigator.of(context).pop(); // Close the sending dialog
+      }
 
       if (response.statusCode == 200) {
         Navigator.of(context).pop();
-        _showPopup("Video & Location sent successfully!", autoClose: true);
+        ShowSnackbar()
+            .showSnackbar('Audio Sent Successfully', Colors.green, context);
       } else {
-        final responseBody = jsonDecode(response.body);
-        _showPopup("Failed to send Video & Location", autoClose: true);
+        ShowSnackbar().showSnackbar(
+            'Failed to send Video & Location', Colors.red, context);
       }
     } catch (e) {
-      if (!mounted) return; // Check again after async operation
-      _showPopup("Error occurred", autoClose: true);
+      if (mounted) {
+        Navigator.of(context).pop(); // Close the sending dialog
+      }
+      ShowSnackbar().showSnackbar('Error occurred', Colors.red, context);
+    } finally {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (builder) => Mainscreen(isLoading: true,),
+        ),
+      );
     }
   }
 
-//Pop up for Loaction
-  _showPopup(String message, {bool autoClose = false}) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        if (autoClose) {
-          Future.delayed(Duration(seconds: 2), () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-              if (message == 'Video & Location sent successfully!' ||
-                  message == "Failed to send Video & Location" ||
-                  message == 'Error occurred') {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (builder) => Sos(),
-                  ),
-                );
-              }
-            }
-          });
-        }
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          backgroundColor: Colors.white,
-          content: Text(
-            message,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showMessage(String message) {
+  void _showMessage(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
@@ -312,47 +318,49 @@ class _VideoRecorderScreenState extends State<VideoRecorderScreen> {
       onWillPop: () async {
         return _secondsElapsed >= 20;
       },
-      child: Scaffold(
-        body: Stack(
-          children: [
-            if (isLoading)
-              Center(
-                child: CircularProgressIndicator(),
-              ),
-            if (_controller != null && _controller!.value.isInitialized)
-              Positioned.fill(
-                child: CameraPreview(_controller!),
-              ),
-
-            // Display the recording timer and status
-            if (_isRecording)
-              Positioned(
-                bottom: 20,
-                left: 0,
-                right: 0,
-                child: Column(
-                  children: [
-                    Text(
-                      'Video Recording:  ${10 - _timerValue} sec',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.red,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    IconButton(
-                      onPressed: _stopRecording,
-                      icon: Icon(
-                        Icons.stop_circle,
-                        color: Colors.white,
-                        size: 48,
-                      ),
-                    ),
-                  ],
+      child: ConnectivityWrapper(
+        child: Scaffold(
+          body: Stack(
+            children: [
+              if (isLoading)
+                Center(
+                  child: CircularProgressIndicator(),
                 ),
-              ),
-          ],
+              if (_controller != null && _controller!.value.isInitialized)
+                Positioned.fill(
+                  child: CameraPreview(_controller!),
+                ),
+
+              // Display the recording timer and status
+              if (_isRecording)
+                Positioned(
+                  bottom: 20,
+                  left: 0,
+                  right: 0,
+                  child: Column(
+                    children: [
+                      Text(
+                        'Video Recording:  ${10 - _timerValue} sec',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      IconButton(
+                        onPressed: () {},
+                        icon: Icon(
+                          Icons.stop_circle,
+                          color: Colors.white,
+                          size: 48,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

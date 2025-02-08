@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "967087150580",
+    "project_id": "posh-ea963",
+    "storage_bucket": "posh-ea963.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:967087150580:android:8b1ef84e9e4e5cdb5215a1",
+        "android_client_info": {
+          "package_name": "com.example.posh"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUEgdYjlpsdfuFeTh9rYvxKdEy1i3qCTI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:posh/Model/ComplaintModel.dart';
 import 'package:posh/Model/DataProvider.dart';
+import 'package:posh/Model/connectivity_wrapper.dart';
 import 'package:posh/Widgets/ComplaintCard.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert'; // For jsonDecode
@@ -13,14 +15,13 @@ class Status extends StatefulWidget {
 }
 
 class _StatusState extends State<Status> {
+  bool _isLoading = true; // To control shimmer effect
+
   @override
   void initState() {
     super.initState();
-    // Fetch data in the background if not already fetched
-    final dataProvider = Provider.of<DataProvider>(context, listen: false);
-    if (dataProvider.complaints.isEmpty) {
-      _fetchData(dataProvider);
-    }
+    // Fetch data when the screen is first opened
+    _fetchData();
   }
 
   Future<String?> getToken() async {
@@ -28,10 +29,12 @@ class _StatusState extends State<Status> {
     return prefs.getString('auth_token');
   }
 
-  Future<void> _fetchData(DataProvider dataProvider) async {
+  Future<void> _fetchData() async {
+    final dataProvider = Provider.of<DataProvider>(context, listen: false);
     const apiUrl =
         'https://tech-hackathon-glowhive.onrender.com/api/complaints/user';
     final token = await getToken(); // Replace with your token logic
+
     try {
       final response = await http.get(
         Uri.parse(apiUrl),
@@ -58,6 +61,10 @@ class _StatusState extends State<Status> {
       }
     } catch (e) {
       print('Error fetching complaints: $e');
+    } finally {
+      setState(() {
+        _isLoading = false; // Stop shimmer effect
+      });
     }
   }
 
@@ -65,80 +72,89 @@ class _StatusState extends State<Status> {
   Widget build(BuildContext context) {
     final dataProvider = Provider.of<DataProvider>(context);
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: Row(
-          children: [
-            GestureDetector(
-              onTap: () {
-                Navigator.pop(context);
-              },
-              child: Icon(
-                Icons.arrow_back,
-                color: Colors.white,
+    return ConnectivityWrapper(
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          title: Row(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                },
+                child: Icon(
+                  Icons.arrow_back,
+                  color: Colors.white,
+                ),
               ),
-            ),
-            SizedBox(
-              width: 20,
-            ),
-            Text(
-              'Complaint Status',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w500,
-                color: Colors.white,
+              SizedBox(
+                width: 20,
+              ),
+              Text(
+                'Complaint Status',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+        ),
+        body: Column(
+          children: [
+            SizedBox(height: 20),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () => _fetchData(),
+                child: _isLoading
+                    ? _buildShimmerEffect() // Show shimmer effect while loading
+                    : dataProvider.complaints.isEmpty
+                        ? Center(child: Text('No complaints available'))
+                        : ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: dataProvider.complaints.length,
+                            itemBuilder: (context, index) {
+                              final complaint = dataProvider.complaints[index];
+                              if (complaint.statement.isEmpty ||
+                                  complaint.description.isEmpty) {
+                                return SizedBox.shrink();
+                              }
+                              return ComplaintCard(
+                                complaint: complaint,
+                              );
+                            },
+                          ),
               ),
             ),
           ],
         ),
-        backgroundColor: Theme.of(context).colorScheme.primary,
       ),
-      body: Column(
-        children: [
-          SizedBox(height: 20),
-          // Title and refresh button
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0),
-            child: Row(
-              children: [
-                Text(
-                  'List of All Complaints',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black.withOpacity(0.8),
-                  ),
-                ),
-              ],
+    );
+  }
+
+  // Shimmer effect widget
+  Widget _buildShimmerEffect() {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: 5, // Number of shimmer placeholders
+      itemBuilder: (context, index) {
+        return Shimmer.fromColors(
+          baseColor: Colors.grey[300]!,
+          highlightColor: Colors.grey[100]!,
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
             ),
+            height: 100, // Height of the shimmer placeholder
           ),
-          SizedBox(height: 20),
-          // Complaints list with pull-to-refresh
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () => _fetchData(dataProvider),
-              child: dataProvider.complaints.isEmpty
-                  ? Center(child: Text('No complaints available'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: dataProvider.complaints.length,
-                      itemBuilder: (context, index) {
-                        final complaint = dataProvider.complaints[index];
-                        if (complaint.statement.isEmpty ||
-                            complaint.description.isEmpty) {
-                          return SizedBox.shrink();
-                        }
-                        return ComplaintCard(
-                          complaint: complaint,
-                        );
-                      },
-                    ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

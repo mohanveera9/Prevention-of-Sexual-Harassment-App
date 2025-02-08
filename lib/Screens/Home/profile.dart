@@ -52,7 +52,7 @@ class _ProfileState extends State<Profile> {
     if (name.isEmpty) {
       final userModel = Provider.of<UserModel>(context, listen: false);
       _nameController.text = userModel.name;
-      ShowSnakbar()
+      ShowSnackbar()
           .showSnackbar('Username cannot be empty.', Colors.red, context);
 
       return;
@@ -83,18 +83,18 @@ class _ProfileState extends State<Profile> {
         final userModel = Provider.of<UserModel>(context, listen: false);
         userModel.updateName(name);
         _nameController.text = name; // Update the text controller
-        ShowSnakbar()
+        ShowSnackbar()
             .showSnackbar('Name updated successfully.', Colors.green, context);
       } else {
         final userModel = Provider.of<UserModel>(context, listen: false);
         _nameController.text = userModel.name;
-        ShowSnakbar()
+        ShowSnackbar()
             .showSnackbar('Failed to update name.', Colors.red, context);
       }
     } catch (e) {
       final userModel = Provider.of<UserModel>(context, listen: false);
       _nameController.text = userModel.name;
-      ShowSnakbar().showSnackbar(
+      ShowSnackbar().showSnackbar(
           'An error occurred. Check your connection and try again.',
           Colors.red,
           context);
@@ -109,7 +109,7 @@ class _ProfileState extends State<Profile> {
     if (number.isEmpty) {
       final userModel = Provider.of<UserModel>(context, listen: false);
       _primaryController.text = userModel.primary;
-      ShowSnakbar()
+      ShowSnackbar()
           .showSnackbar('Primary Number cannot be empty.', Colors.red, context);
       return;
     }
@@ -117,7 +117,7 @@ class _ProfileState extends State<Profile> {
     if (number.length != 10) {
       final userModel = Provider.of<UserModel>(context, listen: false);
       _primaryController.text = userModel.primary;
-      ShowSnakbar()
+      ShowSnackbar()
           .showSnackbar('Enter a valid 10-digit number.', Colors.red, context);
       return;
     }
@@ -126,7 +126,7 @@ class _ProfileState extends State<Profile> {
     if (!regEx.hasMatch(number)) {
       final userModel = Provider.of<UserModel>(context, listen: false);
       _primaryController.text = userModel.primary;
-      ShowSnakbar()
+      ShowSnackbar()
           .showSnackbar('Enter a valid 10-digit number.', Colors.red, context);
       return;
     }
@@ -154,18 +154,18 @@ class _ProfileState extends State<Profile> {
         final userModel = Provider.of<UserModel>(context, listen: false);
         userModel.updateNumber(number);
         _primaryController.text = number; // Update the text controller
-        ShowSnakbar().showSnackbar(
+        ShowSnackbar().showSnackbar(
             'Primary SOS updated successfully.', Colors.green, context);
       } else {
         final userModel = Provider.of<UserModel>(context, listen: false);
         _primaryController.text = userModel.primary;
-        ShowSnakbar()
+        ShowSnackbar()
             .showSnackbar('Failed to update Primary SOS.', Colors.red, context);
       }
     } catch (e) {
       final userModel = Provider.of<UserModel>(context, listen: false);
       _primaryController.text = userModel.primary;
-      ShowSnakbar().showSnackbar(
+      ShowSnackbar().showSnackbar(
           'An error occurred. Check your connection and try again.',
           Colors.red,
           context);
@@ -209,21 +209,21 @@ class _ProfileState extends State<Profile> {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         await Geolocator.openLocationSettings();
-        ShowSnakbar().showSnackbar('Trun on location', Colors.red, context);
+        ShowSnackbar().showSnackbar('Trun on location', Colors.red, context);
         return;
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        ShowSnakbar()
+        ShowSnackbar()
             .showSnackbar('Please allow location', Colors.red, context);
         return;
       }
 
       if (permission == LocationPermission.deniedForever) {
         permission = await Geolocator.requestPermission();
-        ShowSnakbar()
+        ShowSnackbar()
             .showSnackbar('Please allow location', Colors.red, context);
         return;
       }
@@ -237,7 +237,7 @@ class _ProfileState extends State<Profile> {
         _lag = position.longitude.toString();
       });
     } catch (e) {
-      ShowSnakbar().showSnackbar('No internet...', Colors.red, context);
+      ShowSnackbar().showSnackbar('No internet...', Colors.red, context);
     }
   }
 

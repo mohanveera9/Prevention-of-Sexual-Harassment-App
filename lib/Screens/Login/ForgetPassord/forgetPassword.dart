@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:posh/Model/connectivity_wrapper.dart';
 import 'package:posh/Screens/Login/ForgetPassord/Step1.dart';
 import 'package:posh/Screens/Login/ForgetPassord/Step2.dart';
 import 'package:posh/Screens/Login/ForgetPassord/Step3.dart';
@@ -21,72 +22,74 @@ class _ForgetPasswordState extends State<ForgetPassword> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Header Image
-            Image.asset(
-              'assets/img/head.png',
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
-            // Steps Container
-            Padding(
-              padding: const EdgeInsets.all(30.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 10),
-                  // Step Indicator
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildStepIndicator(currentStep >= 1), // Step 1
-                      _buildLine(currentStep >= 2), // Line after Step 1
-                      _buildStepIndicator(currentStep >= 2), // Step 2
-                      _buildLine(currentStep >= 3), // Line after Step 2
-                      _buildStepIndicator(currentStep == 3), // Step 3
-                    ],
-                  ),
-                  const SizedBox(height: 40),
-                  // Step Widgets
-                  if (currentStep == 1)
-                    Step1(
-                      onNext: (String enteredEmail) {
-                        setState(() {
-                          email = enteredEmail;
-                          currentStep = 2;
-                        });
-                      },
-                    ),
-                  if (currentStep == 2)
-                    Step2(
-                      email: email,
-                      onNext: () {
-                        setState(() {
-                          currentStep = 3;
-                        });
-                      },
-                    ),
-                  if (currentStep == 3)
-                    Step3(
-                      email: email,
-                      onNext: () {
-                        // Final logic after Step 3 is completed
-                        showSnackbar('Password reset completed!', Colors.green);
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (builder) => Login(userType: widget.userType,),
-                          ),
-                        );
-                      },
-                    ),
-                ],
+    return ConnectivityWrapper(
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SingleChildScrollView(
+          child: Column(
+            children: [
+              // Header Image
+              Image.asset(
+                'assets/img/head.png',
+                width: double.infinity,
+                fit: BoxFit.cover,
               ),
-            ),
-          ],
+              // Steps Container
+              Padding(
+                padding: const EdgeInsets.all(30.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 10),
+                    // Step Indicator
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildStepIndicator(currentStep >= 1), // Step 1
+                        _buildLine(currentStep >= 2), // Line after Step 1
+                        _buildStepIndicator(currentStep >= 2), // Step 2
+                        _buildLine(currentStep >= 3), // Line after Step 2
+                        _buildStepIndicator(currentStep == 3), // Step 3
+                      ],
+                    ),
+                    const SizedBox(height: 40),
+                    // Step Widgets
+                    if (currentStep == 1)
+                      Step1(
+                        onNext: (String enteredEmail) {
+                          setState(() {
+                            email = enteredEmail;
+                            currentStep = 2;
+                          });
+                        },
+                      ),
+                    if (currentStep == 2)
+                      Step2(
+                        email: email,
+                        onNext: () {
+                          setState(() {
+                            currentStep = 3;
+                          });
+                        },
+                      ),
+                    if (currentStep == 3)
+                      Step3(
+                        email: email,
+                        onNext: () {
+                          // Final logic after Step 3 is completed
+                          showSnackbar('Password reset completed!', Colors.green);
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (builder) => Login(userType: widget.userType,),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

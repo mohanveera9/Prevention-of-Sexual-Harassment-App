@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:posh/API/loginApi.dart';
+import 'package:posh/Model/connectivity_wrapper.dart';
 import 'package:posh/Screens/Login/login.dart';
 import 'package:posh/Widgets/customButton.dart';
 import 'package:posh/Widgets/customTextFeild.dart';
@@ -34,8 +35,9 @@ class _SignupState extends State<Signup> {
     } else if (userType == 'staff') {
       return staffRegex.hasMatch(email);
     }
-    return false; 
+    return false;
   }
+
   void validateFields() async {
     setState(() {
       emailError = null;
@@ -58,7 +60,7 @@ class _SignupState extends State<Signup> {
     });
 
     if (usernameError != null || emailError != null || phoneError != null) {
-      return; // Stop further execution if there are validation errors
+      return;
     }
 
     setState(() {
@@ -75,104 +77,108 @@ class _SignupState extends State<Signup> {
         (emailErr) {
           setState(() {
             emailError = emailErr;
+            isLoading = false;
+          });
+        },
+        (loading) {
+          setState(() {
+            isLoading =
+                loading; // This will update the loading state dynamically
           });
         },
       );
     } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('An error occurred. Please try again.'),
           backgroundColor: Colors.red,
         ),
       );
-    } finally {
-      setState(() {
-        isLoading = false;
-      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            child: Column(
-              children: [
-                Image.asset(
-                  'assets/img/head.png',
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 30, right: 30),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(height: 30),
-                        Heading(text: 'Sign Up'),
-                        SizedBox(height: 30),
-                        CustomTextField(
-                          controller: usernameController,
-                          hintText: 'Username',
-                          icon: Icon(Icons.person_outline),
-                          error: usernameError,
-                        ),
-                        SizedBox(height: 25),
-                        CustomTextField(
-                          controller: emailController,
-                          hintText: 'Email',
-                          icon: Icon(Icons.email_outlined),
-                          error: emailError,
-                        ),
-                        SizedBox(height: 25),
-                        CustomTextField(
-                          controller: phoneController,
-                          hintText: 'Mobile Number',
-                          icon: Icon(Icons.call_outlined),
-                          error: phoneError,
-                          isNumber: true,
-                        ),
-                        SizedBox(height: 30),
-                        customButton(
-                          isLoading: isLoading,
-                          function: isLoading
-                              ? () {}
-                              : () {
-                                  validateFields();
-                                },
-                          color: Color.fromARGB(255, 30, 123, 179),
-                          textColor: Colors.white,
-                          text: 'Next',
-                        ),
-                        SizedBox(height: 20),
-                        Otheroptions(
-                          text1: 'Already have an account? ',
-                          text2: 'Login',
-                          color: Colors.black,
-                          tColor: Color.fromARGB(255, 30, 123, 179),
-                          function: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => Login(
-                                  userType: widget.userType,
+    return ConnectivityWrapper(
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Stack(
+          children: [
+            SingleChildScrollView(
+              child: Column(
+                children: [
+                  Image.asset(
+                    'assets/img/head.png',
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 30, right: 30),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(height: 30),
+                          Heading(text: 'Sign Up'),
+                          SizedBox(height: 30),
+                          CustomTextField(
+                            controller: usernameController,
+                            hintText: 'Username',
+                            icon: Icon(Icons.person_outline),
+                            error: usernameError,
+                          ),
+                          SizedBox(height: 25),
+                          CustomTextField(
+                            controller: emailController,
+                            hintText: 'Email',
+                            icon: Icon(Icons.email_outlined),
+                            error: emailError,
+                          ),
+                          SizedBox(height: 25),
+                          CustomTextField(
+                            controller: phoneController,
+                            hintText: 'Mobile Number',
+                            icon: Icon(Icons.call_outlined),
+                            error: phoneError,
+                            isNumber: true,
+                          ),
+                          SizedBox(height: 30),
+                          customButton(
+                            isLoading: isLoading,
+                            function: isLoading ? () {} : validateFields,
+                            color: Color.fromARGB(255, 30, 123, 179),
+                            textColor: Colors.white,
+                            text: 'Next',
+                          ),
+                          SizedBox(height: 20),
+                          Otheroptions(
+                            text1: 'Already have an account? ',
+                            text2: 'Login',
+                            color: Colors.black,
+                            tColor: Color.fromARGB(255, 30, 123, 179),
+                            function: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => Login(
+                                    userType: widget.userType,
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

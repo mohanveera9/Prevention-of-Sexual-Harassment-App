@@ -1,10 +1,10 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:posh/Model/DataProvider.dart';
 import 'package:posh/Model/LocationModel.dart';
+import 'package:posh/Model/connectivity_wrapper.dart';
 import 'package:posh/Model/userModel/user.dart';
 import 'package:posh/Model/userModel/userModel.dart';
 import 'package:posh/Model/userProvider.dart';
@@ -12,7 +12,7 @@ import 'package:posh/Screens/Home/Home.dart';
 import 'package:posh/Screens/Home/HomeShimmer.dart';
 import 'package:posh/Screens/Home/SOS/sos.dart';
 import 'package:posh/Screens/Home/profile.dart';
-import 'package:posh/Widgets/show_snakbar.dart';
+import 'package:posh/Screens/Login/loginMain.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -147,12 +147,26 @@ class _MainscreenState extends State<Mainscreen> {
     }
   }
 
+  int retryCount = 0;
+  final int maxRetries = 3;
   Future<void> fetchUserWithShimmer() async {
     setState(() {
       isLoadingUser = true;
       hasError = false;
     });
     await fetchUser();
+    if (hasError) {
+      retryCount++;
+      if (retryCount >= maxRetries) {
+        // Navigate to Login page after multiple failures
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (builder) => Loginmain(),
+          ),
+        );
+        return;
+      }
+    }
     setState(() => isLoadingUser = false);
   }
 
@@ -192,91 +206,93 @@ class _MainscreenState extends State<Mainscreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      resizeToAvoidBottomInset: false,
-      body: isLoadingUser
-          ? HomeShimmer()
-          : hasError
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'An error occurred. Please try again.',
-                        style: TextStyle(fontSize: 16, color: Colors.red),
-                      ),
-                      SizedBox(height: 10),
-                      ElevatedButton(
-                        onPressed: fetchUserWithShimmer,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
+    return ConnectivityWrapper(
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        resizeToAvoidBottomInset: false,
+        body: isLoadingUser
+            ? HomeShimmer()
+            : hasError
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'An error occurred. Please try again.',
+                          style: TextStyle(fontSize: 16, color: Colors.red),
                         ),
-                        child: Text('Retry',
-                            style: TextStyle(color: Colors.white)),
-                      ),
-                    ],
+                        SizedBox(height: 10),
+                        ElevatedButton(
+                          onPressed: fetchUserWithShimmer,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                          ),
+                          child: Text('Retry',
+                              style: TextStyle(color: Colors.white)),
+                        ),
+                      ],
+                    ),
+                  )
+                : PageView(
+                    controller: _pageController,
+                    onPageChanged: (index) {
+                      setState(() {
+                        currentPage = index;
+                      });
+                    },
+                    children: pages,
                   ),
-                )
-              : PageView(
-                  controller: _pageController,
-                  onPageChanged: (index) {
-                    setState(() {
-                      currentPage = index;
-                    });
-                  },
-                  children: pages,
-                ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.redAccent,
-        shape: CircleBorder(),
-        onPressed: () {
-          _pageController.jumpToPage(1);
-          setState(() {
-            currentPage = 1;
-          });
-        },
-        child: Icon(
-          Icons.sos,
-          color: Colors.white,
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+        floatingActionButton: FloatingActionButton(
+          backgroundColor: Colors.redAccent,
+          shape: CircleBorder(),
+          onPressed: () {
+            _pageController.jumpToPage(1);
+            setState(() {
+              currentPage = 1;
+            });
+          },
+          child: Icon(
+            Icons.sos,
+            color: Colors.white,
+          ),
         ),
-      ),
-      bottomNavigationBar: BottomAppBar(
-        padding: EdgeInsets.symmetric(horizontal: 45),
-        surfaceTintColor: Colors.transparent,
-        height: 60,
-        color: Color.fromARGB(255, 30, 123, 179),
-        shape: CircularNotchedRectangle(),
-        notchMargin: 8,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            IconButton(
-              onPressed: () {
-                _pageController.jumpToPage(0);
-                setState(() {
-                  currentPage = 0;
-                });
-              },
-              icon: Icon(
-                Icons.home,
-                color: currentPage == 0 ? Colors.white : Colors.white70,
+        bottomNavigationBar: BottomAppBar(
+          padding: EdgeInsets.symmetric(horizontal: 45),
+          surfaceTintColor: Colors.transparent,
+          height: 60,
+          color: Color.fromARGB(255, 30, 123, 179),
+          shape: CircularNotchedRectangle(),
+          notchMargin: 8,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                onPressed: () {
+                  _pageController.jumpToPage(0);
+                  setState(() {
+                    currentPage = 0;
+                  });
+                },
+                icon: Icon(
+                  Icons.home,
+                  color: currentPage == 0 ? Colors.white : Colors.white70,
+                ),
               ),
-            ),
-            IconButton(
-              onPressed: () {
-                _pageController.jumpToPage(2);
-                setState(() {
-                  currentPage = 2;
-                });
-              },
-              icon: Icon(
-                Icons.person,
-                color: currentPage == 2 ? Colors.white : Colors.white70,
+              IconButton(
+                onPressed: () {
+                  _pageController.jumpToPage(2);
+                  setState(() {
+                    currentPage = 2;
+                  });
+                },
+                icon: Icon(
+                  Icons.person,
+                  color: currentPage == 2 ? Colors.white : Colors.white70,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

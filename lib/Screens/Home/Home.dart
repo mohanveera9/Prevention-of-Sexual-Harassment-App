@@ -7,7 +7,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:posh/Model/DataProvider.dart';
 import 'package:posh/Model/userModel/userModel.dart';
 import 'package:posh/Model/userProvider.dart';
-import 'package:posh/Screens/Home/HomeShimmer.dart';
 import 'package:posh/Screens/Home/SOS/emergency.dart';
 import 'package:posh/Screens/Home/complaint.dart';
 import 'package:posh/Screens/Home/status.dart';
@@ -33,6 +32,7 @@ class _HomeState extends State<Home> {
   String _lag = '';
   Timer? _locationTimer;
 
+//for location
   void _showCountdownDialog(BuildContext context, String lat, String lag) {
     _countdown = 3; // Reset the countdown every time the dialog is opened
     bool isDialogActive = true; // Track dialog state
@@ -96,6 +96,7 @@ class _HomeState extends State<Home> {
     });
   }
 
+//after location
   void _showSendingDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -104,15 +105,15 @@ class _HomeState extends State<Home> {
         return AlertDialog(
           title: Text(
             'Sending Location...',
-            style: TextStyle(
-              fontSize: 20
-            ),
+            style: TextStyle(fontSize: 20),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const CircularProgressIndicator(),
-              SizedBox(height: 10,)
+              SizedBox(
+                height: 10,
+              )
             ],
           ),
         );
@@ -125,6 +126,7 @@ class _HomeState extends State<Home> {
     return prefs.getString('auth_token');
   }
 
+//send location api
   Future<void> sendLocation(String lat, String lag) async {
     final url = Uri.parse(
         'https://tech-hackathon-glowhive.onrender.com/api/user/sos/submit');
@@ -141,46 +143,49 @@ class _HomeState extends State<Home> {
           "location": [lat, lag],
         }),
       );
-
+      print(lat);
       if (mounted) {
         Navigator.of(context).pop(); // Close the sending dialog
       }
-
+      
       if (response.statusCode == 200) {
-        ShowSnakbar()
+        ShowSnackbar()
             .showSnackbar('Location Sent Successfully', Colors.green, context);
       } else {
-        ShowSnakbar().showSnackbar(
+        ShowSnackbar().showSnackbar(
             'Error occurred, Please try again', Colors.red, context);
       }
     } catch (e) {
       if (mounted) {
         Navigator.of(context).pop(); // Close the sending dialog
       }
-      ShowSnakbar()
+      ShowSnackbar()
           .showSnackbar('Check your internet connection', Colors.red, context);
     }
   }
 
+//for live location
   Future<void> _getLiveLocation() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         await Geolocator.openLocationSettings();
-        ShowSnakbar().showSnackbar('Trun on location', Colors.red, context);
+        ShowSnackbar().showSnackbar('Trun on location', Colors.red, context);
         return;
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        ShowSnakbar().showSnackbar('Please allow location', Colors.red, context);
+        ShowSnackbar()
+            .showSnackbar('Please allow location', Colors.red, context);
         return;
       }
 
       if (permission == LocationPermission.deniedForever) {
         permission = await Geolocator.requestPermission();
-        ShowSnakbar().showSnackbar('Please allow location', Colors.red, context);
+        ShowSnackbar()
+            .showSnackbar('Please allow location', Colors.red, context);
         return;
       }
 
@@ -193,14 +198,15 @@ class _HomeState extends State<Home> {
         _lag = position.longitude.toString();
       });
     } catch (e) {
-      ShowSnakbar().showSnackbar('No internet...', Colors.red, context);
+      ShowSnackbar().showSnackbar('No internet...', Colors.red, context);
     }
   }
 
+//true or false for live
   Future<bool> getLive() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       await Geolocator.openLocationSettings();
-      ShowSnakbar().showSnackbar('Turn on location', Colors.red, context);
+      ShowSnackbar().showSnackbar('Turn on location', Colors.red, context);
       return false;
     }
 
@@ -208,7 +214,8 @@ class _HomeState extends State<Home> {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        ShowSnakbar().showSnackbar('Please allow location', Colors.red, context);
+        ShowSnackbar()
+            .showSnackbar('Please allow location', Colors.red, context);
         return false;
       }
     }
@@ -221,7 +228,7 @@ class _HomeState extends State<Home> {
     // TODO: implement initState
     super.initState();
     _getLiveLocation();
-     WidgetsBinding.instance.addPostFrameCallback((_) async {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final token = await getToken();
       if (token != null) {
         // Set the token in the DataProvider
@@ -267,7 +274,10 @@ class _HomeState extends State<Home> {
                     Center(
                       child: GestureDetector(
                         onTap: () {
-                          HomeShimmer();
+                          ShowSnackbar().showSnackbar(
+                              'Moahn Bala Nagendra veera mohan bala ',
+                              Colors.green,
+                              context);
                         },
                         child: Text(
                           'Emergency help Needed?',
@@ -290,7 +300,10 @@ class _HomeState extends State<Home> {
                                 _showCountdownDialog(context, _lat, _lag);
                               }
                               if (!await getLive()) {
-                                 ShowSnakbar().showSnackbar('Please allow location', Colors.red, context);
+                                ShowSnackbar().showSnackbar(
+                                    'Please allow location',
+                                    Colors.red,
+                                    context);
                               }
                             },
                             child: Stack(

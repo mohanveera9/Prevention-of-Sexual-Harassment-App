@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:posh/Model/connectivity_wrapper.dart';
 import 'package:posh/Widgets/show_snakbar.dart';
 import 'package:record/record.dart'; // Add record package for audio recording
 import 'package:path/path.dart' as p;
@@ -25,7 +26,6 @@ class _MaincallState extends State<Maincall> {
   final AudioRecorder audioRecorder = AudioRecorder();
   Timer? _timer;
   int _secondsElapsed = 0;
-  File? _audioFile;
   bool isRecording = false;
   String? recordingPath;
   bool isLoading = false;
@@ -53,7 +53,7 @@ class _MaincallState extends State<Maincall> {
     return prefs.getString('auth_token');
   }
 
-   //Location
+  //Location
   Future<void> _getLiveLocation() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -82,7 +82,7 @@ class _MaincallState extends State<Maincall> {
         _lag = position.longitude.toString();
       });
     } catch (e) {
-      ShowSnakbar().showSnackbar('No internet...', Colors.red, context);
+      ShowSnackbar().showSnackbar('No internet...', Colors.red, context);
     }
   }
 
@@ -100,7 +100,7 @@ class _MaincallState extends State<Maincall> {
         recordingPath = filePath;
       });
 
-      Future.delayed(Duration(seconds: 10), () async {
+      Future.delayed(Duration(seconds: 15), () async {
         if (isRecording) {
           String? path = await audioRecorder.stop();
           setState(() {
@@ -108,19 +108,10 @@ class _MaincallState extends State<Maincall> {
             recordingPath = path;
           });
           File audioFile = File(recordingPath!);
+          _showSendingDialog(context);
           _uploadAudioToCloudinary(audioFile);
         }
       });
-    }
-  }
-
-  // Stop recording audio
-  Future<void> _stopAudioRecording() async {
-    final path = await audioRecorder.stop();
-    if (path != null) {
-      _audioFile = File(path);
-      print('Audio recorded at: $path');
-      await _uploadAudioToCloudinary(_audioFile!);
     }
   }
 
@@ -181,9 +172,6 @@ class _MaincallState extends State<Maincall> {
         'https://tech-hackathon-glowhive.onrender.com/api/user/sos/submit');
 
     try {
-      // Show "Audio & Location is sending..." dialog
-      _showPopup("Sending Audio and Location...", autoClose: false);
-
       // Create the request body
       final body = jsonEncode({
         "location": [latitude, longitude], // Send location as a JSON array
@@ -199,20 +187,23 @@ class _MaincallState extends State<Maincall> {
         },
         body: body,
       );
-      Navigator.pop(context);
-      // Handle the response
+
+      if (mounted) {
+        Navigator.of(context).pop(); // Close the sending dialog
+      }
       if (response.statusCode == 200) {
-        _showPopup("Audio & Location sent successfully!", autoClose: true);
+        ShowSnackbar()
+            .showSnackbar('Audio Sent Successfully', Colors.green, context);
         print(response.body);
       } else {
-        final responseBody = jsonDecode(response.body);
-        _showPopup(
-            "Failed to send Audio & Location: ${response.statusCode} - ${responseBody['message']}",
-            autoClose: true);
+        ShowSnackbar().showSnackbar(
+            'Failed to send Audio & Location', Colors.red, context);
       }
     } catch (e) {
-      Navigator.pop(context);
-      _showPopup("Error occurred: $e", autoClose: true);
+      if (mounted) {
+        Navigator.of(context).pop(); // Close the sending dialog
+      }
+      ShowSnackbar().showSnackbar('Error occurred', Colors.red, context);
     } finally {
       _cleanupRecordingFile(); // Cleanup the recording file
     }
@@ -228,29 +219,24 @@ class _MaincallState extends State<Maincall> {
     }
   }
 
-  //Pop up for Loaction
-  _showPopup(String message, {bool autoClose = false}) {
+  void _showSendingDialog(BuildContext context) {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
-        if (autoClose) {
-          Future.delayed(Duration(seconds: 2), () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            }
-          });
-        }
+      builder: (context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+          title: Text(
+            'Sending Audio...',
+            style: TextStyle(fontSize: 20),
           ),
-          backgroundColor: Colors.white,
-          content: Text(
-            message,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              SizedBox(
+                height: 10,
+              )
+            ],
           ),
         );
       },
@@ -260,103 +246,105 @@ class _MaincallState extends State<Maincall> {
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
-      onWillPop: () async{
+      onWillPop: () async {
         return _secondsElapsed >= 20;
       },
-      child: Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Color(0xFF6BF3DD),
-                Color(0xFF39D0D1),
-                Color.fromARGB(255, 30, 123, 179),
-                Color(0xFF0C3F9E),
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 40),
-              const Spacer(),
-              CircleAvatar(
-                radius: 50,
-                backgroundColor: Colors.orange.shade700,
-                child: Text(
-                  widget.name.isNotEmpty ? widget.name[0].toUpperCase() : "?",
-                  style: const TextStyle(
-                    fontSize: 40,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                widget.name,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '+91 ${widget.phoneNumber}  India',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.white.withOpacity(0.8),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _formatDuration(_secondsElapsed),
-                style: const TextStyle(fontSize: 18, color: Colors.white),
-              ),
-              const Spacer(flex: 2),
-              GridView(
-                padding: const EdgeInsets.symmetric(horizontal: 50),
-                shrinkWrap: true,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  mainAxisSpacing: 20,
-                  crossAxisSpacing: 20,
-                ),
-                children: [
-                  _buildCallOption(Icons.mic_off, "Mute"),
-                  _buildCallOption(Icons.pause, "Hold"),
-                  _buildCallOption(Icons.add_call, "Add call"),
-                  _buildCallOption(Icons.videocam, "Video"),
-                  _buildCallOption(Icons.voicemail, "Record"),
-                  _buildCallOption(Icons.speaker, "Speaker"),
+      child: ConnectivityWrapper(
+        child: Scaffold(
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFF6BF3DD),
+                  Color(0xFF39D0D1),
+                  Color.fromARGB(255, 30, 123, 179),
+                  Color(0xFF0C3F9E),
                 ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
               ),
-              const Spacer(),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  GestureDetector(
-                    onTap: _secondsElapsed >= 20
-                        ? () {
-                            Navigator.of(context).pop();
-                          }
-                        : (){}, // Disable tap event if `_secondsElapsed` < 20
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.call_end,
-                          color: Colors.white, size: 28),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 40),
+                const Spacer(),
+                CircleAvatar(
+                  radius: 50,
+                  backgroundColor: Colors.orange.shade700,
+                  child: Text(
+                    widget.name.isNotEmpty ? widget.name[0].toUpperCase() : "?",
+                    style: const TextStyle(
+                      fontSize: 40,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 90),
-            ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  widget.name,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '+91 ${widget.phoneNumber}  India',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white.withOpacity(0.8),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _formatDuration(_secondsElapsed),
+                  style: const TextStyle(fontSize: 18, color: Colors.white),
+                ),
+                const Spacer(flex: 2),
+                GridView(
+                  padding: const EdgeInsets.symmetric(horizontal: 50),
+                  shrinkWrap: true,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    mainAxisSpacing: 20,
+                    crossAxisSpacing: 20,
+                  ),
+                  children: [
+                    _buildCallOption(Icons.mic_off, "Mute"),
+                    _buildCallOption(Icons.pause, "Hold"),
+                    _buildCallOption(Icons.add_call, "Add call"),
+                    _buildCallOption(Icons.videocam, "Video"),
+                    _buildCallOption(Icons.voicemail, "Record"),
+                    _buildCallOption(Icons.speaker, "Speaker"),
+                  ],
+                ),
+                const Spacer(),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    GestureDetector(
+                      onTap: _secondsElapsed >= 20
+                          ? () {
+                              Navigator.of(context).pop();
+                            }
+                          : () {}, // Disable tap event if `_secondsElapsed` < 20
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.call_end,
+                            color: Colors.white, size: 28),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 90),
+              ],
+            ),
           ),
         ),
       ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:posh/Model/connectivity_wrapper.dart';
 import 'package:posh/Widgets/customButton.dart';
+import 'package:posh/Widgets/show_snakbar.dart';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -90,267 +92,269 @@ class _ComplaintState extends State<Complaint> {
   };
 
   String? selectedValue;
-  List<String> items = ["Academics","Hostel"];
+  List<String> items = ["Academics", "Hostel"];
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: Row(
-          children: [
-            GestureDetector(
-              onTap: () {
-                Navigator.pop(context);
-              },
-              child: Icon(
-                Icons.arrow_back,
-                color: Colors.white,
+    return ConnectivityWrapper(
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          title: Row(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                },
+                child: Icon(
+                  Icons.arrow_back,
+                  color: Colors.white,
+                ),
               ),
-            ),
-            SizedBox(
-              width: 20,
-            ),
-            Text(
-              'Complaint Status',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w500,
-                color: Colors.white,
+              SizedBox(
+                width: 20,
               ),
-            ),
-          ],
+              Text(
+                'Complaint Status',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Theme.of(context).colorScheme.primary,
         ),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(
-                  left: 20.0, right: 20, bottom: 20, top: 30),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Related to:",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black.withOpacity(0.7),
-                    ),
-                  ),
-                  SizedBox(height: 10),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey),
-                    ),
-                    child: DropdownButton<String>(
-                      isExpanded: true,
-                      value: selectedValue,
-                      underline: SizedBox(),
-                      hint: Text('Select category'),
-                      items: items.map((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          selectedValue = newValue;
-                        });
-                      },
-                    ),
-                  ),
-
-                  SizedBox(height: 20),
-
-                  // Complaint Type Dropdown
-                  Text(
-                    "Complaint Type:",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black.withOpacity(0.7),
-                    ),
-                  ),
-                  SizedBox(height: 10),
-                  _buildDropdownButton(
-                    "Select Type",
-                    ["Harassment", "Personal", "General"],
-                    selectedComplaintType,
-                    (value) {
-                      setState(() {
-                        selectedComplaintType = value;
-                        selectedComplaintCategory = null; // Reset category
-                        selectedAdditionalType =
-                            null; // Reset additional dropdown
-                      });
-                    },
-                  ),
-                  SizedBox(height: 20),
-                  // Complaint Category Dropdown
-                  Text(
-                    "Complaint Category:",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black.withOpacity(0.7),
-                    ),
-                  ),
-                  SizedBox(height: 10),
-                  _buildDropdownButton(
-                    "Select Category",
-                    selectedComplaintType == null
-                        ? []
-                        : complaintCategories[selectedComplaintType]!,
-                    selectedComplaintCategory,
-                    (value) {
-                      setState(() {
-                        selectedComplaintCategory = value;
-                        selectedAdditionalType =
-                            null; // Reset additional dropdown when category changes
-                      });
-                    },
-                  ),
-                  SizedBox(height: 20),
-                  if (selectedComplaintCategory == 'Others') ...[
-                    _buildTextField("Specify Category",
-                        controller: otherCategoryController),
-                    SizedBox(height: 20),
-                  ],
-                  if (selectedComplaintType == 'Harassment' &&
-                      selectedComplaintCategory != null) ...[
+        body: SingleChildScrollView(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(
+                    left: 20.0, right: 20, bottom: 20, top: 30),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      "${selectedComplaintCategory} Type:",
+                      "Related to:",
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
+                        color: Colors.black.withOpacity(0.7),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey),
+                      ),
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: selectedValue,
+                        underline: SizedBox(),
+                        hint: Text('Select category'),
+                        items: items.map((String value) {
+                          return DropdownMenuItem<String>(
+                            value: value,
+                            child: Text(value),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            selectedValue = newValue;
+                          });
+                        },
+                      ),
+                    ),
+      
+                    SizedBox(height: 20),
+      
+                    // Complaint Type Dropdown
+                    Text(
+                      "Complaint Type:",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black.withOpacity(0.7),
                       ),
                     ),
                     SizedBox(height: 10),
                     _buildDropdownButton(
-                      "${selectedComplaintCategory} Type",
-                      additionalDropdownItems[selectedComplaintCategory] ?? [],
-                      selectedAdditionalType,
+                      "Select Type",
+                      ["Harassment", "Personal", "General"],
+                      selectedComplaintType,
                       (value) {
                         setState(() {
-                          selectedAdditionalType = value;
+                          selectedComplaintType = value;
+                          selectedComplaintCategory = null; // Reset category
+                          selectedAdditionalType =
+                              null; // Reset additional dropdown
                         });
                       },
                     ),
-                    if (selectedAdditionalType == 'Others') ...[
-                      _buildTextField(
-                        "Specify ${selectedComplaintCategory} Type",
-                        controller: otherCategoryController,
+                    SizedBox(height: 20),
+                    // Complaint Category Dropdown
+                    Text(
+                      "Complaint Category:",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black.withOpacity(0.7),
                       ),
+                    ),
+                    SizedBox(height: 10),
+                    _buildDropdownButton(
+                      "Select Category",
+                      selectedComplaintType == null
+                          ? []
+                          : complaintCategories[selectedComplaintType]!,
+                      selectedComplaintCategory,
+                      (value) {
+                        setState(() {
+                          selectedComplaintCategory = value;
+                          selectedAdditionalType =
+                              null; // Reset additional dropdown when category changes
+                        });
+                      },
+                    ),
+                    SizedBox(height: 20),
+                    if (selectedComplaintCategory == 'Others') ...[
+                      _buildTextField("Specify Category",
+                          controller: otherCategoryController),
                       SizedBox(height: 20),
                     ],
-                    SizedBox(height: 20),
-                  ],
-                  // Statement TextField
-                  Text(
-                    "Statement:",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black.withOpacity(0.7),
-                    ),
-                  ),
-                  SizedBox(height: 10),
-                  _buildTextField("Add Statement here...",
-                      controller: statementController),
-                  SizedBox(height: 20),
-                  // Additional fields for Harassment
-                  if (selectedComplaintType == 'Harassment') ...[
-                    _buildTextField("Time of Incident",
-                        controller: timeController),
-                    SizedBox(height: 10),
-                    _buildTextField("Location of Incident",
-                        controller: locationController),
-                    SizedBox(height: 10),
-                    _buildTextField("Harasser Details",
-                        controller: harasserDetailsController),
-                    SizedBox(height: 20),
-                  ] else if (selectedComplaintType == 'Personal' ||
-                      selectedComplaintType == 'General') ...[
-                    _buildTextField("Victim Details",
-                        controller: victimDetailsController),
-                    SizedBox(height: 20),
-                  ],
-                  // Description TextField
-                  Text(
-                    "Description:",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black.withOpacity(0.7),
-                    ),
-                  ),
-                  SizedBox(height: 10),
-                  _buildTextField("Write a few lines...",
-                      controller: descriptionController, maxLines: 5),
-                  SizedBox(height: 20),
-                  Text(
-                    "Criticality",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black.withOpacity(0.7),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 10,
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: RadioListTile<bool>(
-                          title: Text("Yes"),
-                          value: true,
-                          groupValue: isCriticality,
-                          onChanged: (value) {
-                            setState(() {
-                              isCriticality = value!;
-                            });
-                          },
+                    if (selectedComplaintType == 'Harassment' &&
+                        selectedComplaintCategory != null) ...[
+                      Text(
+                        "${selectedComplaintCategory} Type:",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      Expanded(
-                        child: RadioListTile<bool>(
-                          title: Text("No"),
-                          value: false,
-                          groupValue: isCriticality,
-                          onChanged: (value) {
-                            setState(() {
-                              isCriticality = value!;
-                            });
-                          },
-                        ),
+                      SizedBox(height: 10),
+                      _buildDropdownButton(
+                        "${selectedComplaintCategory} Type",
+                        additionalDropdownItems[selectedComplaintCategory] ?? [],
+                        selectedAdditionalType,
+                        (value) {
+                          setState(() {
+                            selectedAdditionalType = value;
+                          });
+                        },
                       ),
+                      if (selectedAdditionalType == 'Others') ...[
+                        _buildTextField(
+                          "Specify ${selectedComplaintCategory} Type",
+                          controller: otherCategoryController,
+                        ),
+                        SizedBox(height: 20),
+                      ],
+                      SizedBox(height: 20),
                     ],
-                  ),
-
-                  SizedBox(height: 40),
-                  // Send Mail Button
-                  customButton(
-                    isLoading: isLoading,
-                    function: () {
-                      _validateAndSendComplaint();
-                    },
-                    color: Theme.of(context).colorScheme.primary,
-                    textColor: Colors.white,
-                    text: 'Send Complaint',
-                  ),
-                ],
+                    // Statement TextField
+                    Text(
+                      "Statement:",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black.withOpacity(0.7),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    _buildTextField("Add Statement here...",
+                        controller: statementController),
+                    SizedBox(height: 20),
+                    // Additional fields for Harassment
+                    if (selectedComplaintType == 'Harassment') ...[
+                      _buildTextField("Time of Incident",
+                          controller: timeController),
+                      SizedBox(height: 10),
+                      _buildTextField("Location of Incident",
+                          controller: locationController),
+                      SizedBox(height: 10),
+                      _buildTextField("Harasser Details",
+                          controller: harasserDetailsController),
+                      SizedBox(height: 20),
+                    ] else if (selectedComplaintType == 'Personal' ||
+                        selectedComplaintType == 'General') ...[
+                      _buildTextField("Victim Details",
+                          controller: victimDetailsController),
+                      SizedBox(height: 20),
+                    ],
+                    // Description TextField
+                    Text(
+                      "Description:",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black.withOpacity(0.7),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    _buildTextField("Write a few lines...",
+                        controller: descriptionController, maxLines: 5),
+                    SizedBox(height: 20),
+                    Text(
+                      "Criticality",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black.withOpacity(0.7),
+                      ),
+                    ),
+                    SizedBox(
+                      height: 10,
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: RadioListTile<bool>(
+                            title: Text("Yes"),
+                            value: true,
+                            groupValue: isCriticality,
+                            onChanged: (value) {
+                              setState(() {
+                                isCriticality = value!;
+                              });
+                            },
+                          ),
+                        ),
+                        Expanded(
+                          child: RadioListTile<bool>(
+                            title: Text("No"),
+                            value: false,
+                            groupValue: isCriticality,
+                            onChanged: (value) {
+                              setState(() {
+                                isCriticality = value!;
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+      
+                    SizedBox(height: 40),
+                    // Send Mail Button
+                    customButton(
+                      isLoading: isLoading,
+                      function: () {
+                        _validateAndSendComplaint();
+                      },
+                      color: Theme.of(context).colorScheme.primary,
+                      textColor: Colors.white,
+                      text: 'Send Complaint',
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -418,7 +422,7 @@ class _ComplaintState extends State<Complaint> {
 
     // Prepare the complaint data
     Map<String, dynamic> complaintData = {
-      'section' : selectedValue,
+      'section': selectedValue,
       'statement': statementController.text,
       'description': descriptionController.text,
       'category': selectedComplaintCategory ?? "",
@@ -452,10 +456,8 @@ class _ComplaintState extends State<Complaint> {
       );
 
       if (response.statusCode == 200) {
-        // Success: Show success Snackbar
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Complaint sent successfully!')),
-        );
+        ShowSnackbar().showSnackbar(
+            'Complaint sent successfully!', Colors.green, context);
 
         // Clear all text fields after success
         statementController.clear();
@@ -473,19 +475,14 @@ class _ComplaintState extends State<Complaint> {
         });
         Navigator.of(context).pop();
       } else {
-        // Error: Show error Snackbar
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Failed to send complaint. Please try again!')),
-        );
+        ShowSnackbar().showSnackbar(
+            'Failed to send complaint. Please try again!', Colors.red, context);
       }
     } catch (e) {
-      // Error: Show error Snackbar
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(
-                "An error occurred. Please check your internet connection.")),
-      );
+      ShowSnackbar().showSnackbar(
+          'An error occurred. Please check your internet connection.',
+          Colors.red,
+          context);
     }
     setState(() {
       isLoading = false;

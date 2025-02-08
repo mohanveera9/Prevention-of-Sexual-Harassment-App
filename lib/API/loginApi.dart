@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:posh/Model/userModel/user.dart';
 import 'package:posh/Model/userProvider.dart';
@@ -17,8 +16,9 @@ Future<void> storeToken(String token) async {
 }
 
 bool isValidEmail(String email, String userType) {
-  final userRegex = RegExp(r"^[nsro]\d{6}@rguktn\.ac\.in$");
-  final staffRegex = RegExp(r"^[a-zA-Z]{2}[a-zA-Z0-9_]@rgukt[a-z]\.ac\.in$");
+  final userRegex = RegExp(
+      r"^(r|n|s|o|ro|rs)[0-9]{6}@(rguktn|rguktong|rguktsklm|rguktrkv)\.ac\.in$");
+  final staffRegex = RegExp(r"^[a-zA-Z]{3}[a-zA-Z0-9_]@rgukt[a-z]\.ac\.in$");
 
   if (userType == 'user') {
     return userRegex.hasMatch(email);
@@ -93,10 +93,13 @@ class Loginapi {
           User user = User.fromJson(userJson);
           Provider.of<UserProvider>(context, listen: false).setUser(user);
 
-          Navigator.of(context).pushReplacement(
+          Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(
-              builder: (builder) => Mainscreen(isLoading: true,),
+              builder: (builder) => Mainscreen(
+                isLoading: true,
+              ),
             ),
+            (Route<dynamic> route) => false,
           );
         } else {
           onError('', 'Unexpected response format.');
@@ -111,6 +114,7 @@ class Loginapi {
         );
       }
     } catch (e) {
+      print(e);
       showSnakbar(
         'An error occurred. Check your connection and try again.',
         Colors.red,
@@ -126,23 +130,22 @@ class Loginapi {
     String userType,
     BuildContext context,
     Function(String? emailError) onError,
+    Function(bool) setLoading, // New parameter to update loading state
   ) async {
     final url = Uri.parse('$baseUrl/api/user/email');
-    final body = {
-      'email': email,
-    };
+    final body = {'email': email};
 
     try {
+      setLoading(true); // Start loading
+
       final response = await http.post(
         url,
         body: json.encode(body),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: {'Content-Type': 'application/json'},
       );
 
       if (response.statusCode == 200) {
-        sendOtp(email, context, username, phone, userType);
+        await sendOtp(email, context, username, phone, userType);
       } else {
         onError('Email already exists');
       }
@@ -152,6 +155,8 @@ class Loginapi {
         Colors.red,
         context,
       );
+    } finally {
+      setLoading(false); // Stop loading after process completes
     }
   }
 
@@ -217,17 +222,28 @@ class Loginapi {
   ) async {
     final url = Uri.parse('$baseUrl/api/user/verify/otp');
     final body = {
-      'email': email,
-      'otp': otp,
+      'email': email.trim(),
+      'otp': otp.trim(), // Ensure OTP has no spaces
     };
 
-    try {
-      final response = await http.post(url, body: json.encode(body), headers: {
-        'Content-Type': 'application/json',
-      });
+    print('🔹 Sending OTP Verification Request...');
+    print('🔹 URL: $url');
+    print('🔹 Request Body: $body');
 
-      print(response.body);
+    try {
+      final response = await http.post(
+        url,
+        body: json.encode(body),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      print('🔹 Response Code: ${response.statusCode}');
+      print('🔹 Response Body: ${response.body}');
+
+      final responseData = json.decode(response.body);
+
       if (response.statusCode == 200) {
+        print('✅ OTP Verified Successfully!');
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (builder) => Password(
@@ -238,16 +254,14 @@ class Loginapi {
             ),
           ),
         );
-        showSnakbar(
-          'Otp verified succesfully',
-          Colors.green,
-          context,
-        );
+        showSnakbar('OTP verified successfully', Colors.green, context);
       } else {
-        final error = json.decode(response.body)['message'] ?? 'Unknown error';
+        final error = responseData['message'] ?? 'Invalid OTP';
+        print('❌ API Error: $error');
         onError(error);
       }
     } catch (e) {
+      print('❌ Exception Occurred: $e');
       showSnakbar(
         'An error occurred. Check your connection and try again.',
         Colors.red,
@@ -286,35 +300,35 @@ class Loginapi {
           'Content-Type': 'application/json',
         },
       );
-
-      if (response.statusCode == 200) {
+      print(response.statusCode);
+      if (response.statusCode == 201) {
         final data = json.decode(response.body);
-        if (data['user'] != null && data['token'] != null) {
+        print("API Response: $data"); // Debugging print
+
+        if (data.containsKey('user') && data.containsKey('token')) {
           await storeToken(data['token']);
+          print("Token stored successfully");
+
           final userJson = data['user'];
+          print("User JSON: $userJson"); // Debugging print
+
           User user = User.fromJson(userJson);
           Provider.of<UserProvider>(context, listen: false).setUser(user);
+
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (builder) => Mainscreen( isLoading: true,),
+              builder: (builder) => Mainscreen(isLoading: true),
             ),
           );
         } else {
-          final error =
-              json.decode(response.body)['message'] ?? 'Unknown Error';
-          showSnakbar(
-            error,
-            Colors.red,
-            context,
-          );
+          print("Unexpected Response Structure: $data");
+          showSnakbar("Unexpected Response Structure", Colors.red, context);
         }
       } else {
-        final error = json.decode(response.body)['message'] ?? 'Unknown Error';
-        showSnakbar(
-          error,
-          Colors.red,
-          context,
-        );
+        final error = 'Error occured';
+        print("Error: $error");
+        print("Full Response: ${response.body}");
+        showSnakbar(error, Colors.red, context);
       }
     } catch (e) {
       showSnakbar(
@@ -322,73 +336,7 @@ class Loginapi {
         Colors.red,
         context,
       );
-    }
-  }
-
-  Future<void> googleSignUp(
-    BuildContext context,
-    String userType,
-  ) async {
-    final GoogleSignIn googleSignIn = GoogleSignIn();
-
-    try {
-      // Attempt Google Sign-In
-      final GoogleSignInAccount? user = await googleSignIn.signIn();
-      if (user == null) {
-        // User canceled the sign-in
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Sign in canceled')),
-        );
-        return;
-      }
-
-      // Use the email and construct the secret
-      final email = user.email;
-      final secret = email.substring(0, 10);
-
-      if (!isValidEmail(email, userType)) {
-        showSnakbar('Please use a valid RGUKT email.', Colors.red, context);
-        return;
-      }
-
-      // Call your API
-      final response = await http.post(
-        Uri.parse(
-            'https://tech-hackathon-glowhive.onrender.com/api/user/login/google'),
-        headers: {"Content-Type": "application/json"},
-        body: json.encode({"email": email, "secret": secret}),
-      );
-
-      print('Response Code: ${response.statusCode}');
-      print('Response Body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-
-        if (data['user'] != null) {
-          // Store user details and navigate to the next screen
-          User user = User.fromJson(data['user']);
-          Provider.of<UserProvider>(context, listen: false).setUser(user);
-
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => Mainscreen(isLoading: true,),
-            ),
-          );
-          await googleSignIn.signOut();
-        } else {
-          showSnakbar('Unexpected response format', Colors.red, context);
-          await googleSignIn.signOut();
-        }
-      } else {
-        showSnakbar('Account does not exit for this email..Please register',
-            Colors.red, context);
-        await googleSignIn.signOut();
-      }
-    } catch (error) {
-      showSnakbar('An error occurred: $error', Colors.red, context);
-      print(error);
-      await googleSignIn.signOut();
+      print(e);
     }
   }
 }
